@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>例句试听 · Edge TTS 验证</title>
+<style>
+  :root { --bg:#0f1115; --card:#1a1d24; --line:#2a2f3a; --fg:#e8eaed; --muted:#9aa3b2; --accent:#4f8cff; --ok:#3ddc84; --warn:#ffb454; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.6 system-ui,-apple-system,"PingFang SC",sans-serif; background:var(--bg); color:var(--fg); padding:20px; }
+  .wrap { max-width:680px; margin:0 auto; }
+  h2 { margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 18px; font-size:13px; }
+  textarea { width:100%; min-height:90px; background:var(--card); color:var(--fg); border:1px solid var(--line); border-radius:12px; padding:12px; font-size:15px; resize:vertical; }
+  .row { display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin:14px 0; }
+  .row label { color:var(--muted); display:inline-flex; gap:5px; align-items:center; }
+  input[type=range] { width:160px; }
+  button { background:var(--accent); color:#fff; border:0; border-radius:12px; padding:11px 20px; font-size:15px; cursor:pointer; }
+  button:active { transform:translateY(1px); }
+  .status { margin:14px 0 6px; font-size:14px; min-height:22px; }
+  .tag { display:inline-block; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+  .tag.edge { background:rgba(61,220,132,.15); color:var(--ok); }
+  .tag.fallback { background:rgba(255,180,84,.15); color:var(--warn); }
+  audio { width:100%; margin-top:10px; }
+  .hint { color:var(--muted); font-size:12px; margin-top:16px; }
+  code { background:var(--card); padding:1px 6px; border-radius:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2>🔊 例句试听</h2>
+  <p class="sub">用来验证例句发音是否真的走 Edge（自然整句）。下方会显示服务端返回的引擎头 <code>X-Tts-Engine</code>。</p>
+
+  <textarea id="txt">The soldier saved a child in the war.</textarea>
+
+  <div class="row">
+    <label><input type="radio" name="acc" value="2" checked> 美音 Aria</label>
+    <label><input type="radio" name="acc" value="1"> 英音 Ryan</label>
+    <span>语速 <span id="ratev">-10%</span></span>
+    <input type="range" id="rate" min="-40" max="20" value="-10">
+  </div>
+
+  <button id="play">▶ 试听例句</button>
+
+  <div class="status" id="status">点击「试听」开始</div>
+  <audio id="audio" controls></audio>
+
+  <p class="hint">
+    说明：本页通过 <code>fetch('/api/tts/sentence')</code> 取音频，并读取响应头确认引擎。
+    若显示 <span class="tag edge">edge</span> 则为微软自然整句；若显示 <span class="tag fallback">youdao-fallback</span> 表示已降级（逐词拼接，不自然）。
+  </p>
+</div>
+
+<script>
+  var txt = document.getElementById('txt');
+  var rate = document.getElementById('rate');
+  var ratev = document.getElementById('ratev');
+  var play = document.getElementById('play');
+  var status = document.getElementById('status');
+  var audio = document.getElementById('audio');
+
+  rate.addEventListener('input', function () { ratev.textContent = rate.value + '%'; });
+
+  function acc() { return document.querySelector('input[name=acc]:checked').value; }
+  function rateStr() { var v = parseInt(rate.value, 10); return (v > 0 ? '+' : '') + v + '%'; }
+
+  play.addEventListener('click', function () {
+    var text = txt.value.trim();
+    if (!text) { status.textContent = '请输入例句'; return; }
+    status.innerHTML = '请求中…';
+    audio.pause();
+    var url = '/api/tts/sentence?text=' + encodeURIComponent(text) +
+      '&type=' + acc() + '&rate=' + encodeURIComponent(rateStr());
+    // 关键：在 click 同步调用栈内直接设置 src 并 play，
+    // 避开 fetch 异步回调导致的「脱离用户手势」自动播放拦截（手机端最常见）。
+    audio.src = url;
+    var p = audio.play();
+    if (p && p.catch) p.catch(function () { status.textContent = '播放被浏览器拦截，请再点一次按钮'; });
+    // 异步只取引擎头用于显示，不影响播放；拿到头即取消 body，避免二次下载音频。
+    fetch(url).then(function (r) {
+      var engine = r.headers.get('X-Tts-Engine') || 'unknown';
+      var tag = engine === 'edge'
+        ? '<span class="tag edge">edge（自然整句）</span>'
+        : '<span class="tag fallback">youdao-fallback（逐词拼接）</span>';
+      status.innerHTML = '引擎：' + tag + ' ｜ 音频已在播放';
+      if (r.body && r.body.cancel) r.body.cancel();
+    }).catch(function () {});
+  });
+</script>
+</body>
+</html>

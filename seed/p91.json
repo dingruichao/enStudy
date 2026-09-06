@@ -1,0 +1,262 @@
+{
+  "name": "p91",
+  "title": "第 91 页 · bomb → confuse（36 词）",
+  "level": 11,
+  "page": 91,
+  "source": "seed/p91",
+  "createdAt": "2026-08-31",
+  "words": [
+    {
+      "en": "bomb",
+      "phonetic": "/bɒm/",
+      "cn": "n. 炸弹；vt. 轰炸",
+      "example": "The police found a bomb in the old building.",
+      "exampleCn": "警察在旧楼里发现了一颗炸弹。"
+    },
+    {
+      "en": "bother",
+      "phonetic": "/ˈbɒðə(r)/",
+      "cn": "v. 打扰，烦扰；n. 麻烦，烦恼",
+      "example": "Don't bother your brother when he is doing his homework.",
+      "exampleCn": "你哥哥做作业的时候别打扰他。"
+    },
+    {
+      "en": "breathe",
+      "phonetic": "/briːð/",
+      "cn": "v. 呼吸；操心，烦恼",
+      "example": "Take a deep breath and then breathe out slowly.",
+      "exampleCn": "深吸一口气，然后慢慢地呼出来。"
+    },
+    {
+      "en": "brick",
+      "phonetic": "/brɪk/",
+      "cn": "n. 砖，砖块；城墙",
+      "example": "The house is made of red bricks.",
+      "exampleCn": "这座房子是用红砖砌成的。"
+    },
+    {
+      "en": "brief",
+      "phonetic": "/briːf/",
+      "cn": "adj. 简洁的；短暂的",
+      "example": "Please give me a brief answer.",
+      "exampleCn": "请给我一个简短的回答。"
+    },
+    {
+      "en": "broadcast",
+      "phonetic": "/ˈbrɔːdkɑːst/",
+      "cn": "v. 广播，散布；n. 广播节目",
+      "example": "The news will be broadcast on TV at seven.",
+      "exampleCn": "这条新闻将在七点的电视上播出。"
+    },
+    {
+      "en": "burst",
+      "phonetic": "/bɜːst/",
+      "cn": "v./n. 爆裂；突然发作",
+      "example": "The balloon burst when the cat jumped on it.",
+      "exampleCn": "猫跳上去的时候，气球爆了。"
+    },
+    {
+      "en": "bury",
+      "phonetic": "/ˈberɪ/",
+      "cn": "vt. 埋葬，掩藏；使沉浸于",
+      "example": "The dog buried its bone in the garden.",
+      "exampleCn": "狗把骨头埋在了花园里。"
+    },
+    {
+      "en": "bush",
+      "phonetic": "/bʊʃ/",
+      "cn": "n. 灌木丛，矮树丛",
+      "example": "A cat is hiding in the bush.",
+      "exampleCn": "一只猫躲在灌木丛里。"
+    },
+    {
+      "en": "candidate",
+      "phonetic": "/ˈkændɪdət/",
+      "cn": "n. 候选人，候补者；申请求职者",
+      "example": "He is a candidate for class monitor.",
+      "exampleCn": "他是班长候选人。"
+    },
+    {
+      "en": "carpet",
+      "phonetic": "/ˈkɑːpɪt/",
+      "cn": "n. 地毯",
+      "example": "We put a new carpet in the living room.",
+      "exampleCn": "我们在客厅铺了一块新地毯。"
+    },
+    {
+      "en": "castle",
+      "phonetic": "/ˈkɑːsl/",
+      "cn": "n. 城堡",
+      "example": "The children played inside the old castle.",
+      "exampleCn": "孩子们在古城堡里玩耍。"
+    },
+    {
+      "en": "casual",
+      "phonetic": "/ˈkæʒʊəl/",
+      "cn": "adj. 偶然的，碰巧的；非正式的，随便的",
+      "example": "He wore casual clothes to the party.",
+      "exampleCn": "他穿了休闲装去参加聚会。"
+    },
+    {
+      "en": "cattle",
+      "phonetic": "/ˈkætl/",
+      "cn": "n. [总称] 牛；牲畜",
+      "example": "The farmer keeps some cattle on his farm.",
+      "exampleCn": "农夫在他的农场里养了一些牛。"
+    },
+    {
+      "en": "cautious",
+      "phonetic": "/ˈkɔːʃəs/",
+      "cn": "adj. (of) 小心的，谨慎的",
+      "example": "Be cautious when you cross the busy road.",
+      "exampleCn": "过那条车多的马路时要小心。"
+    },
+    {
+      "en": "ceiling",
+      "phonetic": "/ˈsiːlɪŋ/",
+      "cn": "n. 天花板",
+      "example": "There is a light on the ceiling.",
+      "exampleCn": "天花板上有一盏灯。"
+    },
+    {
+      "en": "chairman",
+      "phonetic": "/ˈtʃeəmən/",
+      "cn": "n. [pl. chairmen] 主席，会长，议长",
+      "example": "He is the chairman of the school club.",
+      "exampleCn": "他是学校社团的会长。"
+    },
+    {
+      "en": "channel",
+      "phonetic": "/ˈtʃænl/",
+      "cn": "n. 水渠，海峡；频道，渠道",
+      "example": "Let's watch a movie on Channel 6.",
+      "exampleCn": "我们看六频道的电影吧。"
+    },
+    {
+      "en": "charge",
+      "phonetic": "/tʃɑːdʒ/",
+      "cn": "n. 费用，指控；负责；vt. 索价，指控，使承担",
+      "example": "They charged me ten yuan for the pen.",
+      "exampleCn": "这支笔他们收了我十块钱。"
+    },
+    {
+      "en": "chief",
+      "phonetic": "/tʃiːf/",
+      "cn": "adj. 主要的，首要的；n. 首领",
+      "example": "His chief hobby is playing basketball.",
+      "exampleCn": "他的主要爱好是打篮球。"
+    },
+    {
+      "en": "choke",
+      "phonetic": "/tʃəʊk/",
+      "cn": "v./n. (使) 窒息；噎；阻塞",
+      "example": "He choked on a piece of meat.",
+      "exampleCn": "他被一块肉噎住了。"
+    },
+    {
+      "en": "cigarette",
+      "phonetic": "/ˌsɪɡəˈret/",
+      "cn": "n. 纸烟，香烟",
+      "example": "Smoking cigarettes is bad for your health.",
+      "exampleCn": "吸烟对健康有害。"
+    },
+    {
+      "en": "circumstance",
+      "phonetic": "/ˈsɜːkəmstəns/",
+      "cn": "n. [常 pl.] 情况，形势；环境，状况",
+      "example": "Whatever the circumstances, we must study hard.",
+      "exampleCn": "不管遇到什么情况，我们都要努力学习。"
+    },
+    {
+      "en": "cloth",
+      "phonetic": "/klɒθ/",
+      "cn": "n. 布",
+      "example": "She cleaned the desk with a piece of cloth.",
+      "exampleCn": "她用一块布擦了桌子。"
+    },
+    {
+      "en": "collar",
+      "phonetic": "/ˈkɒlə(r)/",
+      "cn": "n. 衣领",
+      "example": "The collar of his shirt is dirty.",
+      "exampleCn": "他衬衫的领子脏了。"
+    },
+    {
+      "en": "combine",
+      "phonetic": "/kəmˈbaɪn/",
+      "cn": "v. (with) 使结合，联合",
+      "example": "Combine the two colors to make green.",
+      "exampleCn": "把这两种颜色混在一起就变成绿色。"
+    },
+    {
+      "en": "comfort",
+      "phonetic": "/ˈkʌmfət/",
+      "cn": "n./vt. 安慰；(使) 舒适",
+      "example": "Her smile gave me great comfort.",
+      "exampleCn": "她的微笑给了我很大的安慰。"
+    },
+    {
+      "en": "command",
+      "phonetic": "/kəˈmɑːnd/",
+      "cn": "v./n. 命令，指挥",
+      "example": "The teacher commanded us to be quiet.",
+      "exampleCn": "老师命令我们安静。"
+    },
+    {
+      "en": "comment",
+      "phonetic": "/ˈkɒment/",
+      "cn": "n./v. (on) 评论",
+      "example": "Please comment on my drawing.",
+      "exampleCn": "请对我的画提提意见。"
+    },
+    {
+      "en": "committee",
+      "phonetic": "/kəˈmɪtɪ/",
+      "cn": "n. 委员会（[用作单数]）；全体委员",
+      "example": "The school committee will hold a meeting.",
+      "exampleCn": "学校委员会将举行一次会议。"
+    },
+    {
+      "en": "concern",
+      "phonetic": "/kənˈsɜːn/",
+      "cn": "n. 关心，担心，关系；vt. 使关心，涉及",
+      "example": "Her health is my main concern.",
+      "exampleCn": "她的健康是我最担心的。"
+    },
+    {
+      "en": "conclusion",
+      "phonetic": "/kənˈkluːʒn/",
+      "cn": "n. 结论，结束",
+      "example": "We reached a conclusion after the discussion.",
+      "exampleCn": "讨论之后我们得出了结论。"
+    },
+    {
+      "en": "conduct",
+      "phonetic": "/kənˈdʌkt/",
+      "cn": "vt. 引导，带领，指挥",
+      "example": "The teacher will conduct the experiment.",
+      "exampleCn": "老师将指导这个实验。"
+    },
+    {
+      "en": "conductor",
+      "phonetic": "/kənˈdʌktə(r)/",
+      "cn": "n. (乐队) 指挥；售票员；列车长；导体",
+      "example": "The bus conductor took my ticket.",
+      "exampleCn": "公共汽车售票员收了我的票。"
+    },
+    {
+      "en": "confirm",
+      "phonetic": "/kənˈfɜːm/",
+      "cn": "vt. 证实，确认；使确信；批准",
+      "example": "Can you confirm the time of the meeting?",
+      "exampleCn": "你能确认一下会议的时间吗？"
+    },
+    {
+      "en": "confuse",
+      "phonetic": "/kənˈfjuːz/",
+      "cn": "vt. 使困惑，使混乱；混淆",
+      "example": "Don't confuse the red box with the blue one.",
+      "exampleCn": "别把红盒子和蓝盒子搞混了。"
+    }
+  ]
+}

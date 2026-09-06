@@ -1,0 +1,28 @@
+{
+  "name": "p941",
+  "title": "P941 · Unit 4 · P32-P34（18 词）",
+  "level": 9,
+  "unit": "Unit 4",
+  "source": "seed/p941",
+  "createdAt": "2026-09-05",
+  "words": [
+    { "en": "position",            "cn": "n. 位置；地方；v. 安置；使处于",        "phonetic": "/pəˈzɪʃn/",     "page": 32 },
+    { "en": "sadness",             "cn": "n. 悲伤",                              "phonetic": "/ˈsædnəs/",     "page": 32 },
+    { "en": "run out (of sth)",    "cn": "用完；耗尽",                          "phonetic": "",              "page": 32 },
+    { "en": "react",               "cn": "v. 作出反应；回应",                    "phonetic": "/riˈækt/",      "page": 32 },
+    { "en": "mix up",              "cn": "混淆；弄乱",                          "phonetic": "",              "page": 33 },
+    { "en": "put sth to good use", "cn": "有效使用（或利用）某物",              "phonetic": "",              "page": 33 },
+    { "en": "chain",               "cn": "n. 链条",                              "phonetic": "/tʃeɪn/",       "page": 33 },
+    { "en": "stable",              "cn": "adj. 稳定的；稳固的",                  "phonetic": "/ˈsteɪbl/",     "page": 33 },
+    { "en": "lecture",             "cn": "n. 讲座；讲课",                        "phonetic": "/ˈlektʃə(r)/",  "page": 33 },
+    { "en": "retell",              "cn": "v. 复述",                              "phonetic": "/ˌriːˈtel/",    "page": 33 },
+    { "en": "memorize",            "cn": "v. 记住；记忆（= memorise）",         "phonetic": "/ˈmeməraɪz/",   "page": 33 },
+    { "en": "tick",                "cn": "v. 给……打钩；n. 对号；钩号",          "phonetic": "/tɪk/",         "page": 33 },
+    { "en": "grandson",            "cn": "n. 孙子；外孙",                        "phonetic": "/ˈgrænsʌn/",   "page": 34 },
+    { "en": "go through",          "cn": "经历；仔细察看",                      "phonetic": "",              "page": 34 },
+    { "en": "happen to",           "cn": "发生于；使遭遇",                      "phonetic": "",              "page": 34 },
+    { "en": "keep (...) in mind",  "cn": "记在心中；记住",                      "phonetic": "",              "page": 34 },
+    { "en": "case",                "cn": "n. 情况；事实",                        "phonetic": "/keɪs/",        "page": 34 },
+    { "en": "in sb's case",        "cn": "就某人的情况而言",                    "phonetic": "",              "page": 34 }
+  ]
+}

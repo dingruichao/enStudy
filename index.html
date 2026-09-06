@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#4f46e5">
+<title>单词周 · 拍照背单词</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="phone">
+  <header class="topbar">
+    <div class="topbar-l">
+      <h1 id="pageTitle">拍照录入</h1>
+      <p id="pageSub" class="sub">把单词表拍下来，自动生成本周背诵库</p>
+    </div>
+    <button id="userBtn" class="user-chip" type="button">
+      <span id="userBtnLabel">登录</span>
+    </button>
+    <button id="weekBtn" class="week-chip" type="button">
+      <span id="weekBtnLabel">本周</span>
+      <svg viewBox="0 0 24 24" width="14" height="14"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </header>
+
+  <main id="view" class="view"></main>
+
+  <nav class="tabbar">
+    <button class="tab is-active" data-tab="capture" type="button">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 8.5A2.5 2.5 0 0 1 5.5 6h1.7l1.2-2h6.2l1.2 2h1.7A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12.5" r="3.4" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+      <span>录入</span>
+    </button>
+    <button class="tab" data-tab="library" type="button">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l1.5 2H18a1.5 1.5 0 0 1 1.5 1.5V17a1.5 1.5 0 0 1-1.5 1.5h-12A1.5 1.5 0 0 1 4.5 17V5.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8 10h8M8 13.5h5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>词库</span>
+    </button>
+    <button class="tab" data-tab="practice" type="button">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 3.5 14.2 9l5.8.6-4.3 3.9 1.2 5.7L12 16.2 6.1 19.2l1.2-5.7L3 9.6 9.8 9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      <span>练习</span>
+    </button>
+    <button class="tab" data-tab="dictation" type="button">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M14.5 5.5l4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <span>听写</span>
+    </button>
+    <button class="tab" data-tab="stats" type="button">
+      <svg viewBox="0 0 24 24" width="22" height="22"><path d="M5 19V11M12 19V5M19 19v-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <span>统计</span>
+    </button>
+  </nav>
+</div>
+
+<div id="sheetRoot"></div>
+<div id="toast" class="toast"></div>
+
+<script src="js/auth.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ocr.js"></script>
+<script src="js/practice.js"></script>
+<script src="js/views.js"></script>
+<script src="seed/p52.js"></script>
+<script src="seed/p87.js"></script>
+<script src="seed/p88.js"></script>
+<script src="seed/p91.js"></script>
+<script src="seed/p92.js"></script>
+<script src="seed/p97.js"></script>
+<script src="seed/p98.js"></script>
+<script src="seed/p99.js"></script>
+<script src="seed/p111.js"></script>
+<script src="seed/p112.js"></script>
+<script src="seed/p113.js"></script>
+<script src="seed/p941.js"></script>
+<script src="seed/p942.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

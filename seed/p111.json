@@ -1,0 +1,18 @@
+{
+  "name": "p111",
+  "title": "第 111 页 · Unit 5 词汇（8 词）",
+  "level": 9,
+  "page": 111,
+  "source": "seed/p111",
+  "createdAt": "2026-09-04",
+  "words": [
+    { "en": "invention",        "cn": "n. 发明；创造",                 "phonetic": "[ɪnˈvenʃn]" },
+    { "en": "camera",           "cn": "n. 照相机；(电影) 摄影机",       "phonetic": "[ˈkæmərə]" },
+    { "en": "laptop",           "cn": "n. 笔记本电脑",                  "phonetic": "[ˈlæptɒp]" },
+    { "en": "high-speed train", "cn": "高速列车",                       "phonetic": "[ˌhaɪ spiːd treɪn]" },
+    { "en": "super",            "cn": "adj. 超级的；顶好的",             "phonetic": "[ˈsuːpə(r)]" },
+    { "en": "sunglasses",       "cn": "n. 墨镜",                         "phonetic": "[ˈsʌŋɡlɑːsɪz]" },
+    { "en": "mini-",            "cn": "prefix. 微型的；短的",             "phonetic": "[ˈmɪni]" },
+    { "en": "itself",           "cn": "pron. 它自己",                   "phonetic": "[ɪtˈself]" }
+  ]
+}

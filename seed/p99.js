@@ -1,0 +1,256 @@
+/* 种子词表（内联，避免 file:// 下 fetch 被浏览器拦截） */
+window.SEED = window.SEED || {};
+window.SEED.p99 = {
+  "name": "p99",
+  "title": "99页 · wisdom→chemist",
+  "level": 12,
+  "page": 99,
+  "source": "seed/p99",
+  "words": [
+    {
+      "en": "wisdom",
+      "cn": "n. 智慧",
+      "phonetic": "[ˈwɪzdəm]",
+      "example": "The old man shared his wisdom about life.",
+      "exampleCn": "老人分享了他对人生的智慧。"
+    },
+    {
+      "en": "advanced",
+      "cn": "adj. 先进的; 高级的; 高等的",
+      "phonetic": "[ədˈvɑːnst]",
+      "example": "They use advanced computers in this lab.",
+      "exampleCn": "这个实验室使用先进的电脑。"
+    },
+    {
+      "en": "aeroplane",
+      "cn": "n. 飞机",
+      "phonetic": "[ˈeərəpleɪn]",
+      "example": "The aeroplane flew above the clouds.",
+      "exampleCn": "飞机在云层之上飞行。"
+    },
+    {
+      "en": "afterwards",
+      "cn": "adv. 之后; 后来; 以后",
+      "phonetic": "[ˈɑːftəwədz]",
+      "example": "We had dinner and afterwards we watched a film.",
+      "exampleCn": "我们吃了晚饭,然后看了一部电影。"
+    },
+    {
+      "en": "album",
+      "cn": "n. 专辑; 音乐专辑",
+      "phonetic": "[ˈælbəm]",
+      "example": "Her new album is very popular with young people.",
+      "exampleCn": "她的新专辑很受年轻人的欢迎。"
+    },
+    {
+      "en": "ambulance",
+      "cn": "n. 救护车",
+      "phonetic": "[ˈæmbjələns]",
+      "example": "The ambulance arrived quickly and saved the man.",
+      "exampleCn": "救护车很快到达,救了那个人。"
+    },
+    {
+      "en": "anymore",
+      "cn": "adv. 不再",
+      "phonetic": "[ˌeniˈmɔː]",
+      "example": "He doesn't live here anymore.",
+      "exampleCn": "他已经不住在这里了。"
+    },
+    {
+      "en": "Arabic",
+      "cn": "n. 阿拉伯语; adj. 阿拉伯的",
+      "phonetic": "[ˈærəbɪk]",
+      "example": "She is learning Arabic at evening classes.",
+      "exampleCn": "她在上夜校学阿拉伯语。"
+    },
+    {
+      "en": "armchair",
+      "cn": "n. 扶手椅",
+      "phonetic": "[ˈɑːmtʃeə(r)]",
+      "example": "Grandpa is reading a book in his armchair.",
+      "exampleCn": "爷爷正坐在扶手椅里看书。"
+    },
+    {
+      "en": "arrow",
+      "cn": "n. 箭; 箭号; 箭头",
+      "phonetic": "[ˈærəʊ]",
+      "example": "He shot an arrow and hit the target.",
+      "exampleCn": "他射出一支箭,击中了靶子。"
+    },
+    {
+      "en": "attractive",
+      "cn": "adj. 有吸引力的; 诱人的",
+      "phonetic": "[əˈtræktɪv]",
+      "example": "The small town has attractive old streets.",
+      "exampleCn": "这座小镇有迷人的老街。"
+    },
+    {
+      "en": "awesome",
+      "cn": "adj. 令人惊叹的; 极好的",
+      "phonetic": "[ˈɔːsəm]",
+      "example": "The view from the mountain was awesome.",
+      "exampleCn": "从山顶看到的景色令人惊叹。"
+    },
+    {
+      "en": "barbecue",
+      "cn": "n. 烧烤; v. 烧烤",
+      "phonetic": "[ˈbɑːbɪkjuː]",
+      "example": "We had a barbecue in the garden on Sunday.",
+      "exampleCn": "我们周日 在花园里烤了肉。"
+    },
+    {
+      "en": "battery",
+      "cn": "n. 电池",
+      "phonetic": "[ˈbætri]",
+      "example": "My phone battery is dead. I need a charger.",
+      "exampleCn": "我手机没电了,需要充电。"
+    },
+    {
+      "en": "beginner",
+      "cn": "n. 新手; 初学者",
+      "phonetic": "[bɪˈgɪnə(r)]",
+      "example": "This swimming class is for beginners.",
+      "exampleCn": "这个游泳班是给初学者的。"
+    },
+    {
+      "en": "beginning",
+      "cn": "n. 开始; 起初",
+      "phonetic": "[bɪˈgɪnɪŋ]",
+      "example": "The beginning of the story was a little slow.",
+      "exampleCn": "故事的开头有点慢。"
+    },
+    {
+      "en": "bet",
+      "cn": "v. 打赌; n. 赌金",
+      "phonetic": "[bet]",
+      "example": "I bet you five dollars that we'll win.",
+      "exampleCn": "我跟你赌五美元,我们会赢。"
+    },
+    {
+      "en": "booklet",
+      "cn": "n. 小册子",
+      "phonetic": "[ˈbʊklɪt]",
+      "example": "The school gave out a booklet about safety rules.",
+      "exampleCn": "学校发了一本关于安全规则的小册子。"
+    },
+    {
+      "en": "bookshelf",
+      "cn": "n. 书架",
+      "phonetic": "[ˈbʊkʃelf]",
+      "example": "There are fifty books on her bookshelf.",
+      "exampleCn": "她的书架上有五十本书。"
+    },
+    {
+      "en": "bookshop",
+      "cn": "n. 书店",
+      "phonetic": "[ˈbʊkʃɒp]",
+      "example": "We bought that novel at the bookshop downtown.",
+      "exampleCn": "我们在市中心的书店买了那本小说。"
+    },
+    {
+      "en": "bounce",
+      "cn": "v. (使)弹起; 反弹",
+      "phonetic": "[baʊns]",
+      "example": "The ball bounced off the wall.",
+      "exampleCn": "球从墙上弹了回来。"
+    },
+    {
+      "en": "boyfriend",
+      "cn": "n. 男朋友",
+      "phonetic": "[ˈbɔɪfrend]",
+      "example": "She has been my girlfriend, not my boyfriend.",
+      "exampleCn": "她是我的女朋友,不是男朋友。"
+    },
+    {
+      "en": "brake",
+      "cn": "n. 刹车; v. 刹(车)",
+      "phonetic": "[breɪk]",
+      "example": "He stepped on the brake to stop the car.",
+      "exampleCn": "他踩下刹车把车停下。"
+    },
+    {
+      "en": "brilliant",
+      "cn": "adj. 杰出的; 很成功的",
+      "phonetic": "[ˈbrɪliənt]",
+      "example": "She gave a brilliant speech at school.",
+      "exampleCn": "她在学校做了一次精彩的演讲。"
+    },
+    {
+      "en": "broom",
+      "cn": "n. 扫帚",
+      "phonetic": "[bruːm]",
+      "example": "Grandma uses a broom to sweep the floor.",
+      "exampleCn": "奶奶用扫帚扫地。"
+    },
+    {
+      "en": "businesswoman",
+      "cn": "n. 女商人",
+      "phonetic": "[ˈbɪznəswʊmən]",
+      "example": "She became a successful businesswoman at thirty.",
+      "exampleCn": "她三十岁就成了成功的女商人。"
+    },
+    {
+      "en": "cafe",
+      "cn": "n. 咖啡馆",
+      "phonetic": "[ˈkæfeɪ]",
+      "example": "We met at a small cafe near the school.",
+      "exampleCn": "我们在学校附近的一家小咖啡馆见面。"
+    },
+    {
+      "en": "campsite",
+      "cn": "n. 营地; 野营地",
+      "phonetic": "[ˈkæmpsaɪt]",
+      "example": "We set up our tent at the campsite by the lake.",
+      "exampleCn": "我们在湖边的营地上搭了帐篷。"
+    },
+    {
+      "en": "canal",
+      "cn": "n. 运河",
+      "phonetic": "[kəˈnæl]",
+      "example": "We went boating on the canal last weekend.",
+      "exampleCn": "上周末我们去运河划船了。"
+    },
+    {
+      "en": "career",
+      "cn": "n. 职业; 事业",
+      "phonetic": "[kəˈrɪə(r)]",
+      "example": "She has had a long career as a doctor.",
+      "exampleCn": "她做了很久的医生工作。"
+    },
+    {
+      "en": "cave",
+      "cn": "n. 山洞; 洞穴",
+      "phonetic": "[keɪv]",
+      "example": "We found a small cave behind the trees.",
+      "exampleCn": "我们在树后面发现了一个小山洞。"
+    },
+    {
+      "en": "cellphone",
+      "cn": "n. 手机; 移动电话",
+      "phonetic": "[ˈselfəʊn]",
+      "example": "Don't use your cellphone while driving.",
+      "exampleCn": "开车时请不要使用手机。"
+    },
+    {
+      "en": "chatroom",
+      "cn": "n. 聊天室",
+      "phonetic": "[ˈtʃætruːm]",
+      "example": "He met some friends in an online chatroom.",
+      "exampleCn": "他在一个网络聊天室认识了一些朋友。"
+    },
+    {
+      "en": "cheeseburger",
+      "cn": "n. 芝士汉堡",
+      "phonetic": "[ˈtʃiːzbɜːgə(r)]",
+      "example": "I'll have a cheeseburger and a Coke, please.",
+      "exampleCn": "我要一个芝士汉堡和一杯可乐。"
+    },
+    {
+      "en": "chemist",
+      "cn": "n. 药剂师; 药房",
+      "phonetic": "[ˈkemɪst]",
+      "example": "She bought some medicine at the chemist on the corner.",
+      "exampleCn": "她在街角的药房买了一些药。"
+    }
+  ]
+};

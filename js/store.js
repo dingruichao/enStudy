@@ -12,6 +12,7 @@ window.Store = (function () {
       currentProvider: '',   // 当前选中的服务商 id（'' 表示旧数据，首次打开设置时迁移到 providers）
       providers: {},          // 每服务商独立存 { apiKey, model }，互不影响
       useLocalOcr: true,
+      ocrMode: 'ai',                 // ai=AI 优先失败降级本地 | local=只用本地 RapidOCR | ai_only=只用 AI
       ttsLang: 'en-US',
       ttsVoice: '',
       ttsRate: 0.9,

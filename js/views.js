@@ -108,7 +108,23 @@ window.Views = (function () {
     { key: 'p92', title: 'P92', note: 'consist→dozen，37 词，含例句' },
     { key: 'p97', title: 'P97', note: 'responsibility→sink，35 词，含例句' },
     { key: 'p98', title: 'P98', note: 'skil(l)ful→whisper，34 词，含例句' },
-    { key: 'p99', title: 'P99', note: 'wisdom→chemist，35 词，含例句' }
+    { key: 'p99', title: 'P99', note: 'wisdom→chemist，35 词，含例句' },
+    { key: 'p22', title: 'P22', note: 'splash→quickly，27 词（4 级 Lv.4 课本词表），无例句' },
+    { key: 'p27', title: 'P27', note: 'list→quite，33 词（5 级 Lv.5 课本词表），无例句' },
+    { key: 'p31', title: 'P31', note: 'formal→clear，33 词（6 级 Lv.6 课本词表），无例句' },
+    { key: 'p37', title: 'P37', note: 'drama→reporter，31 词（7 级 Lv.7 课本词表，含 4 个人名），无例句' },
+    { key: 'p53', title: 'P53', note: 'pleasant→Edward，35 词（8 级 Lv.8 课本词表，含 5 个人名），无例句' },
+    { key: 'p54', title: 'P54', note: 'Mark Twain→pollination，36 词（8 级 Lv.8 课本词表，含 2 个人名 1 个城市名），无例句' },
+  { key: 'p55', title: 'P55', note: 'pollen→butter，36 词（8 级 Lv.8 课本词表，含 1 个人名 1 个地名），无例句' },
+  { key: 'p56', title: 'P56', note: 'cheese→cream，37 词（8 级 Lv.8 课本词表），无例句' },
+    { key: 'p85', title: 'P85 · 十级词汇表', note: 'account→congratulation，31 词（10 级 Lv.10 课本词表，含 2 个缩写 AI/a.m.），无例句' },
+    { key: 'p86', title: 'P86 · 十级词汇表', note: 'cooperate→joy，31 词（10 级 Lv.10 课本词表，含 1 个过去分词 crowded），无例句' },
+    { key: 'p89', title: 'P89 · 十一级词汇表', note: 'abandon→appearance，31 词（11 级 Lv.11 课本词表，含 analyse/anxious 等），无例句' },
+    { key: 'p90', title: 'P90 · 十一级词汇表', note: 'apply→blanket，37 词（11 级 Lv.11 课本词表，49 词 altitude 疑为 attitude 拼写错误），无例句' },
+    { key: 'p93', title: 'P93', note: 'drug→forecast，36 词（11 级 Lv.11 课本词表，含 1 个不规则动词过去式），无例句' },
+    { key: 'p94', title: 'P94', note: 'former→interrupt，36 词（11 级 Lv.11 课本词表），无例句' },
+    { key: 'p95', title: 'P95 · 十二级词汇表', note: 'journalist→owe，34 词（12 级 Lv.12 课本词表），无例句' },
+    { key: 'p96', title: 'P96 · 十二级词汇表', note: 'pace→respond，37 词（12 级 Lv.12 课本词表），无例句' }
   ];
 
   /* 取种子词表的级别（缺失返回极大值，排到末尾） */
@@ -140,8 +156,12 @@ window.Views = (function () {
   /* 渲染单个种子词表卡片 HTML（被 captureRender 与 seedListRender 复用） */
   function renderSeedCardHTML(c, i) {
     var lv = seedLevel(c.key);
-    var note = c.note.replace(/，含例句$/, '');
-    var meta = esc(note) + (lv === 9999 ? '' : '，Lv.' + lv) + '，含例句';
+    // note 末尾可显式声明 "，含例句" / "，无例句" 决定是否显示；未声明则默认含例句
+    var note = c.note;
+    var hasEg = true;
+    if (/，无例句$/.test(note)) { note = note.replace(/，无例句$/, ''); hasEg = false; }
+    else if (/，含例句$/.test(note)) { note = note.replace(/，含例句$/, ''); hasEg = true; }
+    var meta = esc(note) + (lv === 9999 ? '' : '，Lv.' + lv) + (hasEg ? '，含例句' : '，无例句');
     return '<div class="card" style="background:transparent;border:1px dashed var(--line)' + (i ? ';margin-top:10px' : '') + '">' +
       '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（' + esc(c.title) + '）</div>' +
       '<p class="tiny muted" style="margin-top:6px">' + meta + '</p>' +
@@ -1692,7 +1712,12 @@ window.Views = (function () {
       '<button class="btn line" style="flex:0 0 92px" id="s_clearkey">清空 Key</button></div>' +
 
       '<div class="card-t">识别方式</div>' +
-      '<div class="sheet-row"><div class="l">本地 OCR 兜底<small>没配 Key 或 AI 失败时使用，识别较慢</small></div>' +
+      '<div class="sheet-row"><div class="l">优先使用<small>本地 OCR = RapidOCR，免费离线约 3 秒，不消耗 API 额度</small></div>' +
+      '<select id="s_ocrmode" style="border:1px solid var(--line);border-radius:9px;padding:6px 8px">' +
+      '<option value="ai"' + ((s.ocrMode || 'ai') === 'ai' ? ' selected' : '') + '>AI 优先（失败转本地）</option>' +
+      '<option value="local"' + (s.ocrMode === 'local' ? ' selected' : '') + '>只用本地 OCR</option>' +
+      '<option value="ai_only"' + (s.ocrMode === 'ai_only' ? ' selected' : '') + '>只用 AI</option></select></div>' +
+      '<div class="sheet-row"><div class="l">本地 OCR 兜底<small>完全离线、免费，课本双栏词表也能正确分栏</small></div>' +
       '<button class="btn ' + (s.useLocalOcr ? 'ghost' : 'line') + ' sm" id="s_ocr">' + (s.useLocalOcr ? '开启' : '关闭') + '</button></div>' +
 
       '<div class="card-t">发音与语音</div>' +
@@ -1849,6 +1874,9 @@ window.Views = (function () {
         bd.querySelector('#s_ocr').addEventListener('click', function () {
           var v = !Store.settings().useLocalOcr; Store.setSetting('useLocalOcr', v);
           this.className = 'btn ' + (v ? 'ghost' : 'line') + ' sm'; this.textContent = v ? '开启' : '关闭';
+        });
+        bd.querySelector('#s_ocrmode').addEventListener('change', function () {
+          Store.setSetting('ocrMode', this.value); UI.toast('识别方式已保存：' + this.options[this.selectedIndex].text);
         });
         bd.querySelector('#s_speech').addEventListener('click', function () {
           var v = !Store.settings().speech; Store.setSetting('speech', v);

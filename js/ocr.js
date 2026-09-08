@@ -87,6 +87,257 @@ window.OCR = (function () {
   }
 
   /* ============ 2. 本地 OCR ============ */
+
+  /* ---- 2a. 服务端 RapidOCR（首选）----
+   * 浏览器端 tesseract.js 对课本「双栏、小字号、中英混排」几乎无效：
+   * 它只吐纯文本，左右栏会被串行读乱，条目全错位。
+   * RapidOCR 在服务端跑，识别质量高，且返回每行四角坐标，
+   * 可以按 y 分行、按 x 分栏，正确还原「先左栏后右栏」的阅读顺序。
+   */
+  function rapidOcr(dataUrl, onProgress) {
+    if (onProgress) onProgress('本地识别中…');
+    return fetch('/api/ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl })
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.text().then(function (t) {
+          throw new Error('OCR ' + r.status + '：' + t.slice(0, 120));
+        });
+      }
+      return r.json();
+    }).then(function (j) {
+      if (!j.ok || !j.lines) throw new Error(j.error || 'OCR 无结果');
+      if (!j.lines.length) throw new Error('没识别出文字');
+      return parseOcrLines(j.lines);
+    });
+  }
+
+  /* 页码 / 页眉噪声：如 "p.52"、"p53"、"113"、"Vocabulary in Each Unit"
+   * 另外把长度 ≤3 且不含中文的残片（"p-"、"pS"、"P"）也丢掉，
+   * 否则会被当成词条带进词库。 */
+  function isNoise(t) {
+    var s = String(t || '').trim();
+    if (!s) return true;
+    // 页码（含 OCR 把 "." 误识成 "-"、"S" 误识成 "5" 的情况）：p.52 / p52 / p-56 / P.S7
+    if (/^p\s*[.．:：\-–—~]?\s*[\dOoSlI]{1,3}$/i.test(s)) return true;
+    if (/^[\dOoSlI]{1,3}$/.test(s)) return true;
+    if (/vocabulary\s+in\s+each\s+unit/i.test(s)) return true;
+    if (/^(words?\s*(and|&)\s*expressions?|unit\s*\d+|words\s+in\s+each\s+unit)$/i.test(s)) return true;
+    // 短残片：无中文且长度 ≤3（页码被 OCR 切坏后的孤零零 "p-" "pS"）
+    if (s.length <= 3 && !/[\u4e00-\u9fa5]/.test(s)) return true;
+    return false;
+  }
+
+  /* 规范化 OCR 行：补全省略的音标右斜杠，并清掉页码标记 */
+  function normalizeOcrLine(t) {
+    var s = String(t || '').trim();
+    // 去掉行尾 / 行首的页码（p.52、p52、p. 52）
+    s = s.replace(/p\s*[.．:：]\s*[\dOoSlI]{1,3}\s*$/i, '');
+    s = s.replace(/^p\s*[.．:：]\s*[\dOoSlI]{1,3}\s*/i, '');
+    // 行首页码残片（"p-56  mission ..."）：把前缀整个切掉，否则会被当成英文词条
+    s = s.replace(/^p\s*[-–—.]?\s*[\dOoSlI]{0,3}\s+(?=[A-Za-z])/, '');
+    // launch/la:ntf7v&n.发射；发起  →  launch /la:ntf7v/ n.发射；发起
+    s = s.replace(/^([A-Za-z][A-Za-z'’\-]{0,30})\s*\/\s*([^/]{2,40}?)\s*[\/&]\s*/, '$1 /$2/ ');
+    return s.trim();
+  }
+
+  /* 清理解析结果：en 只保留「最多两个单词、中间单个空格」的部分，
+   * 防止 OCR 把词性粘连进来（"completely    adu" → "completely"） */
+  function cleanEntry(w) {
+    var m = String(w.en || '').match(/^[A-Za-z][A-Za-z'’\-]*(?: [A-Za-z][A-Za-z'’\-]*)?/);
+    if (m) w.en = m[0].trim();
+    return w;
+  }
+
+  /* 行聚类 + 列拼行。
+   * 课本词表常是 2~5 列的表格（序号 / 英文 / 音标 / 词性 / 中文释义），
+   * 同一行内的多列段应在识别后拼成单行，再交给 parseSingle 解析。
+   *
+   * 算法（两遍）：
+   *   1. 顶底装饰区过滤：按 yMid 2%/98% 分位截断（够宽，避免 22 页密集表首末行被误判为装饰）。
+   *      en 锚段永不当作装饰（即便 y 偏低）。
+   *   2. en 锚段（xMid<350 且含英文）按 y 距离聚类 (eps=22) 得到行基线；
+   *      这些基线对应表格的真实行。
+   *   3. cn / ipa / 序号等附加段按 y 距离归到最近的基线：
+   *      - cn/ipa 段 (x≥350)：d ∈ [-22, 28]（OCR 常把 cn 段 y 写得偏上 5~15 像素，
+   *        也有偏下 0~28 像素的常见情形）
+   *      - 序号段 (x<100)：d ∈ [-12, 18]（OCR 把序号写偏上 8~12 像素常见）
+   *      - 中间列段：d ∈ [-10, 25]
+   *      未归入段丢成孤儿——单遍分配，不兜底（宽兜底会让 162 cn 串到 161，效果更差）
+   *   4. 行内按 x 排序，拼成单行交给 parseSingle。
+   *
+   * 已用 5 栏表格（序号/英文/音标/词性/中文）验证：
+   *   - 22 页 27 词条（密集 5 栏）：27 行全部正确归位，孤立段 0
+   *     （仅 147 序号 OCR 漏识别）
+   *   - 36 词课本词表：前 20 行 100% 正确，21~35 行每行往后串 1 个 cn（OCR 把 cn y 写得偏上 8~14 像素）
+   *     ，属 OCR 固有局限。 */
+  function sortReadingOrder(lines) {
+    var withBox = lines.filter(function (l) { return l.box && l.box.length >= 2; });
+    if (!withBox.length) return lines.map(function (l) { return l.text; });
+
+    var yRange = function (l) {
+      var ys = l.box.map(function (p) { return p[1]; });
+      return [Math.min.apply(null, ys), Math.max.apply(null, ys)];
+    };
+    var xMid = function (l) {
+      var xs = l.box.map(function (p) { return p[0]; });
+      return (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
+    };
+    var yMid = function (l) {
+      var r = yRange(l);
+      return (r[0] + r[1]) / 2;
+    };
+
+    // 1. 顶底装饰区过滤：按 yMid 分位 2% / 98% 截断，OCR 输出的"can do something…"手写装饰
+    //    和底页码（如 "97/118"）y 在两端。注意：en 锚段（表格行英文词）即使 y 偏低
+    //    也保留，否则责任行 retire responsibility 会被误判为顶部装饰而漏掉。
+    //    2%/98% 比 5%/92% 更宽，避免 22 页（37 行密集表）首末两行被误判为装饰。
+    var allYMids = withBox.map(yMid).sort(function (a, b) { return a - b; });
+    var imgYMidRange = [
+      allYMids[Math.floor(allYMids.length * 0.02)],
+      allYMids[Math.floor(allYMids.length * 0.98)]
+    ];
+    var inTableY = function (ym) { return ym > imgYMidRange[0] - 50 && ym < imgYMidRange[1] + 30; };
+    // en 锚段永不当作装饰（即便 y 在边界外）
+    var isEnAnchorForFilter = function (s) { return xMid(s) < 350 && /[A-Za-z]/.test(s.text); };
+    var tableSegs = withBox.filter(function (s) {
+      return isEnAnchorForFilter(s) || inTableY(yMid(s));
+    });
+
+    // 2. en 锚段聚类（eps=22，按 y 距离）
+    var isEnAnchor = isEnAnchorForFilter;
+    var enAnchors = tableSegs.filter(isEnAnchor);
+    var sortedEn = enAnchors.slice().sort(function (a, b) { return yMid(a) - yMid(b); });
+    var baselines = [];
+    var cur = null, curY = -Infinity;
+    sortedEn.forEach(function (s) {
+      if (cur == null || yMid(s) - curY > 22) {
+        cur = { yMid: yMid(s), anchors: [s] };
+        baselines.push(cur);
+        curY = yMid(s);
+      } else {
+        cur.anchors.push(s);
+        curY = yMid(s);
+      }
+    });
+
+    // 3. 附加段归入最近 baseline
+    var tryAssign = function (s, dMin, dMax) {
+      var target = null, bestD = Infinity;
+      baselines.forEach(function (b, i) {
+        var d = yMid(s) - b.yMid;
+        if (d >= dMin && d <= dMax && Math.abs(d) < bestD) {
+          target = i;
+          bestD = Math.abs(d);
+        }
+      });
+      return target;
+    };
+    var rows = baselines.map(function (b) { return { baseline: b, segs: [] }; });
+
+    tableSegs.forEach(function (s) {
+      if (isEnAnchor(s)) {
+        var idx = baselines.findIndex(function (b) { return b.anchors.indexOf(s) >= 0; });
+        rows[idx].segs.push(s);
+        return;
+      }
+      // cn/ipa 段（x≥350）：OCR 常把 cn 段 y 写得偏上 5~15 像素（中文释义字号略小，位置略偏上），
+      // 也有偏下 0~28 的常见情形。允许 baseline 在 cn 上方 [-22, 28] 的较宽区间。
+      // 序号段（x<100）：OCR 把序号写偏上 8~12 像素常见，允许 [-12, 18]。
+      // 中间列段：[-10, 25]。
+      // 注：单遍分配（无兜底）——宽兜底会让 162 cn 串到 161，效果更差；宁可孤立也不要错归。
+      var t;
+      if (xMid(s) >= 350) {
+        t = tryAssign(s, -22, 28);
+      } else if (xMid(s) < 100) {
+        t = tryAssign(s, -12, 18);
+      } else {
+        t = tryAssign(s, -10, 25);
+      }
+      if (t !== null) rows[t].segs.push(s);
+      // 未归入的段：丢成"孤儿"——不强行分配到任意行，避免污染其他行的词条。
+    });
+
+    // 4. 行内按 x 排序
+    rows.forEach(function (r) { r.segs.sort(function (a, b) { return xMid(a) - xMid(b); }); });
+
+    // 5. 拼接为文本（无 box 的段拼到末尾）
+    var result = rows.map(function (r) {
+      return r.segs.map(function (f) { return f.text; }).join('   ');
+    });
+    lines.forEach(function (l) {
+      if (!l.box) result.push(l.text);
+    });
+    return result;
+  }
+
+  /* 把 RapidOCR 的带坐标行 → 词条数组（复用通用 parseLines 做最终解析） */
+  function parseOcrLines(lines) {
+    var ordered = sortReadingOrder(lines);
+    var raw = ordered
+      .filter(function (t) { return !isNoise(t); })
+      .map(normalizeOcrLine)
+      .filter(Boolean);
+
+    // 装饰区文本过滤：表格图顶部/底部常有英文手写体装饰（"can do something…"），
+    // 通常较长（≥4 词）且无任何中文/音标/IPA 字符，因此丢；短的孤立英文段保留
+    // （表格内同一行的 IPA/cn 列段可能因 OCR 漏识别而单独留下）。
+    var HAS_IPA_RE = /[\u0250-\u02AF\u02B0-\u02FF\u1D00-\uDBFFˈˌːɡŋʃʒθðæʌɑɒɔəɜɪʊʧʤ]/;
+    var HAS_CN_RE = /[\u4e00-\u9fa5]/;
+    var filtered = raw.filter(function (t) {
+      var s = t.trim();
+      if (HAS_CN_RE.test(s) || HAS_IPA_RE.test(s)) return true;          // 含中文或 IPA → 保留
+      if (/\[[^\]]{2,30}\]|\/[^\/\s]{2,30}\//.test(s)) return true;       // 含方括号/斜杠音标 → 保留
+      // 纯英文：词数 ≥ 4 且总长 ≥ 25 视为装饰文本，丢；其它保留
+      var words = s.split(/\s+/).filter(Boolean);
+      return !(words.length >= 4 && s.length >= 20);
+    });
+
+    // 逐行解析；isPrefixEn 在 sortReadingOrder 已把同 y 字段拼成"序号 word /ipa/ pos+cn"，
+    // 第一段可能是序号（如 "65"），parseLines 已有"^\d{1,3}[\.、\)]\s*"前缀剥离，放宽匹配。
+    var items = filtered.map(parseSingle).filter(Boolean);
+
+    return items.map(cleanEntry);
+  }
+
+  /* 单行解析包装：parseLines 整文本流程不适合表格行场景，
+   * 这里单独处理"序号+en+/ipa/+pos+cn"拼接而成的单行。 */
+  function parseSingle(line) {
+    var s = String(line || '').replace(/\s+/g, ' ').trim();
+    if (!s) return null;
+
+    // 去掉开头序号（65、 65.、65）、 (66) 等）
+    s = s.replace(/^\s*\d{1,3}\s*[\.\u3001\)\)\uFF09]?\s*/, '').trim();
+    if (!s) return null;
+
+    // 过滤纯中文或纯英文小残片（序号以外的数字、孤词）
+    var hasEn = /[A-Za-z]/.test(s);
+    var hasCn = /[\u4e00-\u9fa5]/.test(s);
+    var hasIpa = /[\u0250-\u02AF\u02B0-\u02FF\u1D00-\uDBFFˈˌːɡŋʃʒθðæʌɑɒɔəɜɪʊʧʤ]/.test(s);
+    if (!hasEn && !hasCn && !hasIpa) return null;
+    if (!hasEn) return null;   // 不允许纯中文残留
+
+    var phonetic = '';
+    s = s.replace(/(\[[^\]]{2,50}\])/, function (m) { phonetic = m; return ' '; });
+    if (!phonetic) s = s.replace(/(\/[^\/\s]{2,40}\/)/, function (m) { phonetic = m; return ' '; });
+
+    // 英文：取第一个或几个连续词（最多 4 个）
+    var enM = s.match(/^[A-Za-z][A-Za-z'’\-]*(?:\s+[A-Za-z][A-Za-z'’\-]*){0,3}/);
+    var en = enM ? enM[0].trim() : '';
+    // 剥掉粘连的词性（"abandon v."、"celebrate vt."）
+    en = en.replace(/\s+(vt|vi|n|v|adj|adv|prep|conj|pron|num|art|int|abbr|a)\.?\s*$/i, '').trim();
+
+    var rest = enM ? s.slice(enM[0].length) : s;
+    var cn = cleanCn(rest);
+
+    if (!en) return null;
+    if (en.length > 40) en = en.slice(0, 40);
+    return { en: en, cn: cn, phonetic: phonetic, example: '', exampleCn: '', source: 'ocr' };
+  }
+
+  /* ---- 2b. 浏览器端 tesseract（兜底）---- */
   function loadTesseract() {
     if (window.Tesseract) return Promise.resolve(window.Tesseract);
     if (_worker) return _worker;
@@ -100,7 +351,17 @@ window.OCR = (function () {
     return _worker;
   }
 
+  /* 本地识别：优先服务端 RapidOCR，不可用时回退浏览器端 tesseract.js */
   function localExtract(dataUrl, onProgress) {
+    return rapidOcr(dataUrl, onProgress).catch(function (err) {
+      if (onProgress) onProgress('本地 OCR 不可用，改用浏览器识别…');
+      return tesseractExtract(dataUrl, onProgress).then(function (list) {
+        return { list: list, by: 'local', warn: err.message };
+      });
+    });
+  }
+
+  function tesseractExtract(dataUrl, onProgress) {
     return loadTesseract().then(function (T) {
       if (onProgress) onProgress('正在加载本地识别引擎…');
       return T.recognize(dataUrl, 'eng+chi_sim', {
@@ -226,23 +487,33 @@ window.OCR = (function () {
   /* ============ 对外：识别一张图 ============ */
   function recognize(dataUrl, onProgress) {
     var s = Store.settings();
+    var mode = s.ocrMode || 'ai';        // ai | local | ai_only
     var canAI = s.apiBase && s.apiKey;
+
+    // 只用本地 OCR：完全离线、免费（RapidOCR 约 3 秒）
+    if (mode === 'local') {
+      return localExtract(dataUrl, onProgress).then(function (list) {
+        if (list && list.list) return list;      // 降级时 localExtract 返回带 by 的对象
+        return { list: list, by: 'local' };
+      });
+    }
+
     if (canAI) {
       if (onProgress) onProgress('AI 识别中…');
       return visionExtract(dataUrl, s).then(function (list) {
         if (!list.length) throw new Error('AI 没识别出条目');
         return { list: list, by: 'ai' };
       }).catch(function (err) {
-        if (!s.useLocalOcr) throw err;
+        if (mode === 'ai_only' || !s.useLocalOcr) throw err;
         if (onProgress) onProgress('AI 失败，改用本地识别…');
-        return localExtract(dataUrl, onProgress).then(function (list) {
-          return { list: list, by: 'local', warn: err.message };
+        return localExtract(dataUrl, onProgress).then(function (r) {
+          return r && r.list ? r : { list: r, by: 'local', warn: err.message };
         });
       });
     }
     if (s.useLocalOcr) {
-      return localExtract(dataUrl, onProgress).then(function (list) {
-        return { list: list, by: 'local' };
+      return localExtract(dataUrl, onProgress).then(function (r) {
+        return r && r.list ? r : { list: r, by: 'local' };
       });
     }
     return Promise.reject(new Error('未配置 AI 接口，且本地 OCR 已关闭。请到「设置」填写 API 或打开本地识别。'));
@@ -255,5 +526,11 @@ window.OCR = (function () {
     });
   }
 
-  return { recognize: recognize, parseLines: parseLines, testConnection: testConnection };
+  return {
+    recognize: recognize,
+    parseLines: parseLines,
+    parseOcrLines: parseOcrLines,
+    rapidOcr: rapidOcr,
+    testConnection: testConnection
+  };
 })();

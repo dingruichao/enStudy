@@ -12,6 +12,7 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { Client } = require('pg');
@@ -599,6 +600,80 @@ async function handleAiChat(req, res) {
   }
 }
 
+/* ---------- 本地 OCR（RapidOCR，离线免费） ----------
+ * 浏览器端的 tesseract.js 对课本双栏小字几乎无效（会把左右栏串行读乱）。
+ * 改用服务端 RapidOCR：识别质量高，且返回每行四角坐标，前端可按坐标分栏。
+ * 模型缓存在本地后单张约 2-4 秒；首次运行会下载模型（约 40 秒）。
+ */
+const OCR_PY = process.env.OCR_RAPID_PY ||
+  path.join(process.env.HOME || '/Users/dingrc', '.workbuddy', 'binaries', 'python', 'envs', 'ocr', 'bin', 'python');
+
+function handleOcr(req, res) {
+  if (req.method !== 'POST') { res.writeHead(405); return res.end('method not allowed'); }
+  let body = '';
+  // 限制 12MB，防止超大图把内存打爆
+  req.on('data', function (d) {
+    body += d;
+    if (body.length > 12 * 1024 * 1024) { req.destroy(); }
+  });
+  req.on('error', function () { res.writeHead(400); res.end('bad request'); });
+  req.on('end', function () {
+    let img = '';
+    try {
+      img = (JSON.parse(body || '{}').image || '').trim();
+    } catch (e) {
+      res.writeHead(400); return res.end('bad json');
+    }
+    // 只接受 data:image/...;base64, 格式
+    const m = img.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]+)$/);
+    if (!m) { res.writeHead(400); return res.end('missing image (expect data:image/*;base64,...)'); }
+    const buf = Buffer.from(m[1], 'base64');
+    if (buf.length > 8 * 1024 * 1024) { res.writeHead(413); return res.end('image too large (max 8MB)'); }
+
+    const tmp = path.join(os.tmpdir(), 'enstudy_ocr_' + Date.now() + '_' + Math.random().toString(36).slice(2) + '.img');
+    fs.writeFile(tmp, buf, function (err) {
+      if (err) { res.writeHead(500); return res.end('write tmp failed: ' + err.message); }
+      const script = path.join(ROOT, 'ocr_rapid.py');
+      let cp;
+      try {
+        cp = spawn(OCR_PY, [script, '--file', tmp], { env: process.env, stdio: ['ignore', 'pipe', 'pipe'] });
+      } catch (e) {
+        fs.unlink(tmp, function () { });
+        return sendJSON(res, 500, { ok: false, error: '无法启动 OCR 引擎：' + e.message });
+      }
+      const chunks = [];
+      let stderr = '';
+      let settled = false;
+      const done = function (obj, code) {
+        if (settled) return; settled = true;
+        fs.unlink(tmp, function () { });
+        sendJSON(res, code, obj);
+      };
+      cp.stdout.on('data', function (d) { chunks.push(d); });
+      cp.stderr.on('data', function (d) { stderr += d.toString(); });
+      cp.on('error', function () {
+        done({ ok: false, error: '未找到 Python OCR 环境（请先安装 rapidocr-onnxruntime）' }, 500);
+      });
+      // 首次运行要下载模型，给 90 秒；常规识别 3 秒左右
+      const timer = setTimeout(function () {
+        try { cp.kill(); } catch (e) { }
+        done({ ok: false, error: 'OCR 识别超时（90 秒）' }, 504);
+      }, 90000);
+      cp.on('close', function (code) {
+        clearTimeout(timer);
+        const out = Buffer.concat(chunks).toString('utf8').trim();
+        let obj = null;
+        try { obj = JSON.parse(out); } catch (e) { }
+        if (!obj) {
+          return done({ ok: false, error: 'OCR 引擎无有效输出：' + (stderr || out).slice(0, 200) }, 500);
+        }
+        if (!obj.ok) return done(obj, 500);
+        done({ ok: true, lines: obj.lines, elapse_ms: obj.elapse_ms, engine: obj.engine }, 200);
+      });
+    });
+  });
+}
+
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/') urlPath = '/index.html';
@@ -647,6 +722,7 @@ async function main() {
     if (u === '/api/tts/sentence') return handleSentenceTts(req, res);
     if (u === '/api/tts/zh') return handleZhTts(req, res);
     if (u === '/api/dict') return handleDict(req, res);
+    if (u === '/api/ocr') return handleOcr(req, res);
     if (u.startsWith('/api/kv/')) {
       const key = decodeURIComponent(u.slice('/api/kv/'.length));
       return handleApi(req, res, key);

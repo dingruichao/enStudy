@@ -5,7 +5,7 @@
  *   3. Auth.login(...)   POST /api/auth/login
  *   4. Auth.logout()     POST /api/auth/logout，清 cookie
  *   5. Auth.on(fn)       订阅 login / logout 事件
- * Server 返回的用户对象：{ id, username, createdAt }
+ * Server 返回的用户对象：{ id, username, createdAt, role }（role: 'admin' | 'user'）
  */
 window.Auth = (function () {
   var user = null;
@@ -30,7 +30,7 @@ window.Auth = (function () {
       .then(parseResp)
       .then(function (out) {
         if (out.status === 200 && out.body && out.body.ok) {
-          user = { id: out.body.userId, username: out.body.username, createdAt: out.body.createdAt };
+          user = { id: out.body.userId, username: out.body.username, createdAt: out.body.createdAt, role: out.body.role };
           emit({ type: 'login', user: user });
           return user;
         }
@@ -50,7 +50,7 @@ window.Auth = (function () {
       .then(parseResp)
       .then(function (out) {
         if (out.status === 200 && out.body && out.body.ok) {
-          user = { id: out.body.userId, username: out.body.username, createdAt: out.body.createdAt };
+          user = { id: out.body.userId, username: out.body.username, createdAt: out.body.createdAt, role: out.body.role };
           emit({ type: 'login', user: user });
         } else { user = null; }
         return out;
@@ -66,7 +66,7 @@ window.Auth = (function () {
       .then(parseResp)
       .then(function (out) {
         if (out.status === 200 && out.body && out.body.ok) {
-          user = { id: out.body.userId, username: out.body.username, createdAt: out.body.createdAt };
+          user = { id: out.body.userId, username: out.body.username, createdAt: out.body.createdAt, role: out.body.role };
           emit({ type: 'login', user: user });
         }
         return out;
@@ -84,11 +84,33 @@ window.Auth = (function () {
       });
   }
 
+  function changePassword(oldPassword, newPassword) {
+    return fetch('/api/auth/change-password', {
+      method: 'POST', credentials: 'same-origin', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldPassword: oldPassword, newPassword: newPassword })
+    }).then(parseResp);
+  }
+
+  // 管理员：列出所有用户（供「重置密码」下拉框）
+  function listUsers() {
+    return fetch('/api/auth/users', { credentials: 'same-origin', cache: 'no-store' }).then(parseResp);
+  }
+
+  // 管理员：重置指定用户密码（无需原密码）
+  function resetPassword(targetUserId, newPassword) {
+    return fetch('/api/auth/reset-password', {
+      method: 'POST', credentials: 'same-origin', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetUserId: targetUserId, newPassword: newPassword })
+    }).then(parseResp);
+  }
+
   function current() { return user; }
   function on(fn) {
     listeners.push(fn);
     return function () { listeners = listeners.filter(function (f) { return f !== fn; }); };
   }
 
-  return { me: me, login: login, signup: signup, logout: logout, current: current, on: on };
+  return { me: me, login: login, signup: signup, logout: logout, changePassword: changePassword, listUsers: listUsers, resetPassword: resetPassword, current: current, on: on };
 })();

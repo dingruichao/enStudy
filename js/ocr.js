@@ -21,7 +21,9 @@ window.OCR = (function () {
 
   /* 经同源后端代理转发（规避浏览器 CORS；外部域名不可直接 fetch） */
   function proxyChat(cfg, extra) {
-    return fetch('/api/ai/chat', {
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 95000) : null;
+    var p = fetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -31,8 +33,12 @@ window.OCR = (function () {
         messages: extra.messages,
         max_tokens: extra.max_tokens,
         temperature: extra.temperature
-      })
+      }),
+      signal: ctrl ? ctrl.signal : undefined
     });
+    // 兜底：即便后端未返回（异常挂起），95s 后也强制结束，避免前端一直"识别中"
+    p.then(function () { if (timer) clearTimeout(timer); }, function () { if (timer) clearTimeout(timer); });
+    return p;
   }
 
   function visionExtract(dataUrl, cfg) {
@@ -48,7 +54,7 @@ window.OCR = (function () {
           ]
         }
       ],
-      max_tokens: 1500,
+      max_tokens: 4096,
       temperature: 0.1
     }).then(function (r) {
       if (!r.ok) {

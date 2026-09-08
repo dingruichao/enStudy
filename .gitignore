@@ -15,3 +15,4 @@ node_modules/
 # 本地环境
 .env
 .env.*
+/.idea/

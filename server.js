@@ -318,6 +318,45 @@ function handleZhTts(req, res) {
   }
 }
 
+/* ---------- 有道词典查词代理（补例句 / 例句翻译，国内可达、无需 key） ----------
+ * 拍照/相册识别出来的词通常只有单词+释义、缺例句，这里转发 dict.youdao.com/jsonapi
+ * 取双语例句（英文例句 + 中文翻译）返回给前端，识别整理保存前自动补齐。
+ * 无需 key；与 TTS 同走 dict.youdao.com，本机国内可达。
+ */
+async function handleDict(req, res) {
+  if (req.method !== 'GET') return sendJSON(res, 405, { error: 'method not allowed' });
+  try {
+    const u = new URL(req.url, 'http://localhost');
+    let q = (u.searchParams.get('q') || '').trim();
+    if (!q) return sendJSON(res, 400, { error: 'missing q' });
+    q = q.replace(/[^\w'’\- .]/g, '').trim();  // 仅保留字母/数字/撇号/连字符/空格/点，防注入
+    if (!q || Buffer.byteLength(q, 'utf8') > 80) return sendJSON(res, 400, { error: 'q too long' });
+    const target = 'https://dict.youdao.com/jsonapi?q=' + encodeURIComponent(q);
+    const upstream = await fetch(target, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; enStudy TTS)',
+        'Referer': 'https://dict.youdao.com/'
+      },
+      signal: AbortSignal.timeout(8000)
+    });
+    if (!upstream.ok) return sendJSON(res, 502, { error: 'youdao ' + upstream.status });
+    const d = await upstream.json();
+    const out = { q: q, sentences: [] };
+    const pairs = d && d.blng_sents_part && d.blng_sents_part['sentence-pair'];
+    if (Array.isArray(pairs)) {
+      out.sentences = pairs.slice(0, 6).map(function (p) {
+        return {
+          en: String(p.sentence || '').replace(/<[^>]+>/g, '').trim(),
+          cn: String(p['sentence-translation'] || '').replace(/<[^>]+>/g, '').trim()
+        };
+      }).filter(function (s) { return s.en && s.cn; });
+    }
+    return sendJSON(res, 200, out);
+  } catch (e) {
+    return sendJSON(res, 502, { error: e.message });
+  }
+}
+
 /* ---------- 外部 AI 调用代理（规避浏览器 CORS） ----------
  * 浏览器直连 token-plan 等端点会被 CORS 拦截，故前端经本同源端点转发。
  * 仅允许白名单内的 https 服务商，避免沦为开放代理（SSRF 防护）。
@@ -325,7 +364,8 @@ function handleZhTts(req, res) {
 const ALLOWED_HOST_SUFFIXES = [
   'dashscope.aliyuncs.com', '.maas.aliyuncs.com',
   'api.siliconflow.cn', 'api.openai.com',
-  'open.bigmodel.cn', '.bigmodel.cn'
+  'open.bigmodel.cn', '.bigmodel.cn',
+  'developer.amd.com.cn'
 ];
 function hostAllowed(h) {
   return ALLOWED_HOST_SUFFIXES.some(function (s) { return h === s || h.endsWith(s); });
@@ -371,7 +411,7 @@ async function getCurrentUser(req) {
   if (!sid || !pool) return null;
   try {
     const r = await withTimeout(pool.query(
-      'SELECT u.id, u.username, u.created_at FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.sid = $1',
+      'SELECT u.id, u.username, u.created_at, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.sid = $1',
       [sid]
     ), 3000, 'auth-me');
     return r.rows[0] || null;
@@ -385,6 +425,7 @@ async function initAuthSchema() {
       '  id            SERIAL PRIMARY KEY,',
       '  username      TEXT NOT NULL UNIQUE,',
       '  password_hash TEXT NOT NULL,',
+      '  role          TEXT NOT NULL DEFAULT \'user\',',
       '  created_at    TIMESTAMP NOT NULL DEFAULT NOW()',
       ');',
       'CREATE TABLE IF NOT EXISTS sessions (',
@@ -392,7 +433,9 @@ async function initAuthSchema() {
       '  user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,',
       '  created_at TIMESTAMP NOT NULL DEFAULT NOW()',
       ');',
-      'CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);'
+      'CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);',
+      'ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT \'user\';',
+      'UPDATE users SET role=\'admin\' WHERE username=\'admin\';'
     ].join('\n')), 5000, 'auth-schema');
     console.log('✅ users / sessions 表已就绪');
   } catch (e) {
@@ -414,14 +457,14 @@ async function handleAuthRegister(req, res) {
     if (existed.rows.length) return sendJSON(res, 409, { error: '用户名已被占用' });
     const hash = hashPassword(password);
     const ins = await withTimeout(pool.query(
-      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, created_at',
+      'INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, created_at, role',
       [username, hash]
     ), 3000, 'auth-insert');
     const user = ins.rows[0];
     const sid = crypto.randomBytes(32).toString('hex');
     await withTimeout(pool.query('INSERT INTO sessions (sid, user_id) VALUES ($1, $2)', [sid, user.id]), 3000, 'auth-session');
     setCookie(res, 'sid', sid, 30);
-    return sendJSON(res, 200, { ok: true, userId: user.id, username: user.username, createdAt: user.created_at });
+    return sendJSON(res, 200, { ok: true, userId: user.id, username: user.username, createdAt: user.created_at, role: user.role });
   } catch (e) { return sendJSON(res, 500, { error: e.message }); }
 }
 
@@ -434,14 +477,14 @@ async function handleAuthLogin(req, res) {
   if (!username || !password) return sendJSON(res, 400, { error: '请输入用户名和密码' });
   if (!pool) return sendJSON(res, 503, { error: '数据库不可用' });
   try {
-    const r = await withTimeout(pool.query('SELECT id, username, password_hash FROM users WHERE username=$1', [username]), 3000, 'auth-login');
+    const r = await withTimeout(pool.query('SELECT id, username, password_hash, role FROM users WHERE username=$1', [username]), 3000, 'auth-login');
     if (!r.rows.length) return sendJSON(res, 401, { error: '用户名或密码错误' });
     const u = r.rows[0];
     if (!verifyPassword(password, u.password_hash)) return sendJSON(res, 401, { error: '用户名或密码错误' });
     const sid = crypto.randomBytes(32).toString('hex');
     await withTimeout(pool.query('INSERT INTO sessions (sid, user_id) VALUES ($1, $2)', [sid, u.id]), 3000, 'auth-session');
     setCookie(res, 'sid', sid, 30);
-    return sendJSON(res, 200, { ok: true, userId: u.id, username: u.username });
+    return sendJSON(res, 200, { ok: true, userId: u.id, username: u.username, role: u.role });
   } catch (e) { return sendJSON(res, 500, { error: e.message }); }
 }
 
@@ -457,7 +500,63 @@ async function handleAuthLogout(req, res) {
 async function handleAuthMe(req, res) {
   const u = await getCurrentUser(req);
   if (!u) return sendJSON(res, 401, { error: 'not authenticated' });
-  return sendJSON(res, 200, { ok: true, userId: u.id, username: u.username, createdAt: u.created_at });
+  return sendJSON(res, 200, { ok: true, userId: u.id, username: u.username, createdAt: u.created_at, role: u.role });
+}
+
+async function handleAuthChangePassword(req, res) {
+  if (req.method !== 'POST') return sendJSON(res, 405, { error: 'method not allowed' });
+  const u = await getCurrentUser(req);
+  if (!u) return sendJSON(res, 401, { error: '未登录' });
+  let body;
+  try { body = JSON.parse(await readBody(req)); } catch (e) { return sendJSON(res, 400, { error: '请求体不是合法 JSON' }); }
+  const oldPassword = String(body.oldPassword || '');
+  const newPassword = String(body.newPassword || '');
+  if (!oldPassword) return sendJSON(res, 400, { error: '请输入当前密码' });
+  if (newPassword.length < 4 || newPassword.length > 64) return sendJSON(res, 400, { error: '新密码需 4-64 位' });
+  if (!pool) return sendJSON(res, 503, { error: '数据库不可用' });
+  try {
+    const r = await withTimeout(pool.query('SELECT password_hash FROM users WHERE id=$1', [u.id]), 3000, 'auth-cp-lookup');
+    if (!r.rows.length) return sendJSON(res, 404, { error: '用户不存在' });
+    if (!verifyPassword(oldPassword, r.rows[0].password_hash)) return sendJSON(res, 401, { error: '当前密码错误' });
+    const hash = hashPassword(newPassword);
+    await withTimeout(pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hash, u.id]), 3000, 'auth-cp-update');
+    return sendJSON(res, 200, { ok: true });
+  } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+}
+
+// 管理员：列出所有用户（id / 用户名 / 角色），供「重置密码」下拉框使用
+async function handleAuthUsers(req, res) {
+  if (req.method !== 'GET') return sendJSON(res, 405, { error: 'method not allowed' });
+  const u = await getCurrentUser(req);
+  if (!u) return sendJSON(res, 401, { error: '未登录' });
+  if (u.role !== 'admin') return sendJSON(res, 403, { error: '需要管理员权限' });
+  if (!pool) return sendJSON(res, 503, { error: '数据库不可用' });
+  try {
+    const r = await withTimeout(pool.query('SELECT id, username, role FROM users ORDER BY id'), 3000, 'auth-users');
+    return sendJSON(res, 200, { ok: true, users: r.rows });
+  } catch (e) { return sendJSON(res, 500, { error: e.message }); }
+}
+
+// 管理员：重置指定用户的密码（无需原密码）
+async function handleAuthResetPassword(req, res) {
+  if (req.method !== 'POST') return sendJSON(res, 405, { error: 'method not allowed' });
+  const u = await getCurrentUser(req);
+  if (!u) return sendJSON(res, 401, { error: '未登录' });
+  if (u.role !== 'admin') return sendJSON(res, 403, { error: '需要管理员权限' });
+  let body;
+  try { body = JSON.parse(await readBody(req)); } catch (e) { return sendJSON(res, 400, { error: '请求体不是合法 JSON' }); }
+  const targetUserId = Number(body.targetUserId);
+  const newPassword = String(body.newPassword || '');
+  if (!targetUserId || isNaN(targetUserId)) return sendJSON(res, 400, { error: '请选择要重置的用户' });
+  if (newPassword.length < 4 || newPassword.length > 64) return sendJSON(res, 400, { error: '新密码需 4-64 位' });
+  if (!pool) return sendJSON(res, 503, { error: '数据库不可用' });
+  try {
+    const t = await withTimeout(pool.query('SELECT id FROM users WHERE id=$1', [targetUserId]), 3000, 'auth-reset-lookup');
+    if (!t.rows.length) return sendJSON(res, 404, { error: '目标用户不存在' });
+    const hash = hashPassword(newPassword);
+    await withTimeout(pool.query('UPDATE users SET password_hash=$1 WHERE id=$2', [hash, targetUserId]), 3000, 'auth-reset-update');
+    return sendJSON(res, 200, { ok: true });
+  } catch (e) { return sendJSON(res, 500, { error: e.message }); }
 }
 
 async function handleAiChat(req, res) {
@@ -477,6 +576,7 @@ async function handleAiChat(req, res) {
     if (ub.protocol !== 'https:') return sendJSON(res, 400, { error: '仅支持 https 端点' });
     if (!hostAllowed(ub.host)) return sendJSON(res, 403, { error: '该 apiBase 不在允许的服务商列表内' });
     const target = ub.origin + ub.pathname.replace(/\/+$/, '') + '/chat/completions';
+    // 给上游请求加超时，避免上游无响应时请求永久挂起（前端就会一直"识别中"）
     const upstream = await fetch(target, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
@@ -485,12 +585,16 @@ async function handleAiChat(req, res) {
         messages: messages,
         max_tokens: body.max_tokens || 1024,
         temperature: (body.temperature != null ? body.temperature : 0.1)
-      })
+      }),
+      signal: AbortSignal.timeout(90000)
     });
     const text = await upstream.text();
     res.writeHead(upstream.status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(text);
   } catch (e) {
+    if (e && (e.name === 'TimeoutError' || e.name === 'AbortError')) {
+      return sendJSON(res, 504, { error: '上游服务响应超时（90 秒未返回），请检查服务商网络或稍后重试' });
+    }
     return sendJSON(res, 502, { error: '代理转发失败：' + e.message });
   }
 }
@@ -536,9 +640,13 @@ async function main() {
     if (u === '/api/auth/login') return handleAuthLogin(req, res);
     if (u === '/api/auth/logout') return handleAuthLogout(req, res);
     if (u === '/api/auth/me') return handleAuthMe(req, res);
+    if (u === '/api/auth/change-password') return handleAuthChangePassword(req, res);
+    if (u === '/api/auth/users') return handleAuthUsers(req, res);
+    if (u === '/api/auth/reset-password') return handleAuthResetPassword(req, res);
     if (u === '/api/tts') return handleTts(req, res);
     if (u === '/api/tts/sentence') return handleSentenceTts(req, res);
     if (u === '/api/tts/zh') return handleZhTts(req, res);
+    if (u === '/api/dict') return handleDict(req, res);
     if (u.startsWith('/api/kv/')) {
       const key = decodeURIComponent(u.slice('/api/kv/'.length));
       return handleApi(req, res, key);

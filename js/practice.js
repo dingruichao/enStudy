@@ -127,6 +127,9 @@ window.Practice = (function () {
     S.queue = q;
     S.idx = 0; S.done = 0; S.ok = 0; S.mode = opt.mode; S.filter = opt.filter; S.last = null;
     S.results = [];       // 本轮每题作答结果：[{item, res, answer}]，完成后在统计页列出错题
+    S.startedAt = Date.now();
+    S.sessionId = 'ps_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    S.saved = false;      // commitSession 完成后置 true，避免重复落库
     return S.queue.length;
   }
 
@@ -155,6 +158,42 @@ window.Practice = (function () {
   function next() { S.idx++; return S.queue[S.idx] || null; }
   function finished() { return S.idx >= S.queue.length; }
   function state() { return S; }
+
+  /* 练习结束时调用：把本轮完整记录（含逐题明细）存入 Store（最终落到 PostgreSQL KV）。
+   * 由 views.js 在 finished 态首次渲染时触发一次，内部用 S.saved 防重入。 */
+  function commitSession() {
+    var S = state();
+    if (S.saved) return null;
+    S.saved = true;
+    var w = Store.activeWeek();
+    var items = (S.results || []).map(function (x) {
+      var wd = x.item.word;
+      var correct = x.item.mode === 'cn2en' ? wd.en
+        : (x.item.mode === 'judge' ? (x.item.judgeRight ? '正确' : '错误')
+          : (wd.cn || '—'));
+      var answer = x.item.mode === 'judge' ? (x.res.picked ? '正确' : '错误') : (x.answer || '（未作答）');
+      return {
+        wordId: wd.id, en: wd.en, cn: wd.cn, phonetic: wd.phonetic || '',
+        wordLevel: Number(wd.level) || 1,
+        page: (wd.page != null ? wd.page : null), isName: !!wd.isName,
+        mode: x.item.mode, ok: !!x.res.ok, judge: x.res.level, r: x.res.r,
+        answer: answer, correct: correct
+      };
+    });
+    var rec = {
+      id: S.sessionId,
+      startedAt: S.startedAt,
+      finishedAt: Date.now(),
+      duration: Math.max(0, Math.round((Date.now() - (S.startedAt || Date.now())) / 1000)),
+      mode: S.mode, filter: S.filter,
+      total: S.done, correct: S.ok,
+      rate: S.done ? Math.round(S.ok / S.done * 100) : 0,
+      weekId: w.id, userId: Store.getUser(),
+      items: items
+    };
+    Store.addPracticeSession(rec);
+    return rec;
+  }
 
   /* ---------- 发音 ---------- */
   // 语音列表是异步加载的，第一次 getVoices() 往往为空，必须缓存 + 监听 voiceschanged，
@@ -345,7 +384,7 @@ window.Practice = (function () {
 
   return {
     buildQueue: buildQueue, cur: cur, total: total, next: next, submit: submit,
-    finished: finished, state: state,
+    finished: finished, state: state, commitSession: commitSession,
     speak: speak, speakZh: speakZh, speakSentence: speakSentence, speakOnline: speakOnline,
     listen: listen, canListen: canListen,
     listVoices: listVoices,

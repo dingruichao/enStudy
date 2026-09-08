@@ -91,7 +91,66 @@ window.Views = (function () {
   /* =========================================================
    *  1. 拍照录入
    * ========================================================= */
-  var cap = { imgs: [], parsed: [], busy: false, defaultPage: '' };
+  var cap = { imgs: [], parsed: [], busy: false, defaultPage: '', view: 'main' };
+
+  /* 种子词表卡片配置：渲染时按「级别升序 → 同级别页码升序」自动排序，
+     排序依据取自 window.SEED 里的 level / page，新增词表只需往这里加一行。 */
+  var SEED_CARDS = [
+    { key: 'p52', title: 'P52', note: 'block→mm，34 词（含短语与缩写），含例句' },
+    { key: 'p941', title: 'P941 · Unit 4', note: "position→in sb's case，18 词（教材 P32-P34 子页），含例句" },
+    { key: 'p942', title: 'P942 · Unit 4', note: 'opera→Bob，46 词（教材 P34-P39 子页，含 3 个人名），含例句' },
+    { key: 'p111', title: 'P111 · Unit 5', note: 'invention→itself，8 词（含短语与前缀），含例句' },
+    { key: 'p112', title: 'P112 · Unit 5 续', note: 'button→production，51 词（含短语与搭配），含例句' },
+    { key: 'p113', title: 'P113 · Unit 5 续2', note: 'step by step→Wilbur Wright，15 词（含短语、缩写、人名全名），含例句' },
+    { key: 'p87', title: 'P87', note: 'judge→relationship，35 词（含 prince/princess 分两词），含例句' },
+    { key: 'p88', title: 'P88', note: 'repair→within，25 词，含例句' },
+    { key: 'p91', title: 'P91', note: 'bomb→confuse，36 词，含例句' },
+    { key: 'p92', title: 'P92', note: 'consist→dozen，37 词，含例句' },
+    { key: 'p97', title: 'P97', note: 'responsibility→sink，35 词，含例句' },
+    { key: 'p98', title: 'P98', note: 'skil(l)ful→whisper，34 词，含例句' },
+    { key: 'p99', title: 'P99', note: 'wisdom→chemist，35 词，含例句' }
+  ];
+
+  /* 取种子词表的级别（缺失返回极大值，排到末尾） */
+  function seedLevel(key) {
+    var d = window.SEED && window.SEED[key];
+    return d && typeof d.level === 'number' ? d.level : 9999;
+  }
+
+  /* 取种子词表的起始页码：优先 page 字段，其次从 title 里解析 "P32-P34" / "52页" */
+  function seedPage(key) {
+    var d = window.SEED && window.SEED[key];
+    if (!d) return 9999;
+    if (typeof d.page === 'number') return d.page;
+    var t = String(d.title || '');
+    var m = t.match(/P(\d+)\s*[-–]\s*P?(\d+)/);
+    if (m) return Number(m[1]);
+    m = t.match(/(\d+)\s*页/);
+    if (m) return Number(m[1]);
+    return 9999;
+  }
+
+  /* 按级别升序，同级别按页码升序 */
+  function sortedSeedCards() {
+    return SEED_CARDS.slice().sort(function (a, b) {
+      return (seedLevel(a.key) - seedLevel(b.key)) || (seedPage(a.key) - seedPage(b.key));
+    });
+  }
+
+  /* 渲染单个种子词表卡片 HTML（被 captureRender 与 seedListRender 复用） */
+  function renderSeedCardHTML(c, i) {
+    var lv = seedLevel(c.key);
+    var note = c.note.replace(/，含例句$/, '');
+    var meta = esc(note) + (lv === 9999 ? '' : '，Lv.' + lv) + '，含例句';
+    return '<div class="card" style="background:transparent;border:1px dashed var(--line)' + (i ? ';margin-top:10px' : '') + '">' +
+      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（' + esc(c.title) + '）</div>' +
+      '<p class="tiny muted" style="margin-top:6px">' + meta + '</p>' +
+      '<div style="display:flex;gap:8px;margin-top:10px">' +
+      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="' + esc(c.key) + '">📥 一键导入 ' + esc(c.key.toUpperCase()) + '</button>' +
+      '</div>' +
+      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
+      '</div>';
+  }
 
   function captureRender(el) {
     var has = cap.imgs.length > 0;
@@ -169,136 +228,26 @@ window.Views = (function () {
       h += '</div>';
     }
 
-    // 种子词表入口：清空当前周 与 一键导入 分成两个独立功能
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line)">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P91）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">bomb→confuse，36 词，Lv.11，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn line sm" style="flex:1" data-act="clear-week">🗑 清空当前周</button>' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p91">📥 一键导入 P91</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">导入会覆盖重复英文词、不新增多条；清空会删除当前周全部词条。</p>' +
-      '</div>';
-
-    // P52 种子词表（level 8）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P52）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">block→mm，34 词（含短语与缩写），Lv.8，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p52">📥 一键导入 P52</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P941 种子词表（level 9 · Unit 4）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P941 · Unit 4）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">position→in sb\'s case，18 词（教材 P32-P34 子页），Lv.9，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p941">📥 一键导入 P941</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P942 种子词表（level 9 · Unit 4）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P942 · Unit 4）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">opera→Bob，46 词（教材 P34-P39 子页，含 3 个人名），Lv.9，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p942">📥 一键导入 P942</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P87 种子词表（level 10）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P87）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">judge→relationship，35 词（含 prince/princess 分两词），Lv.10，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p87">📥 一键导入 P87</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P88 种子词表（level 10）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P88）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">repair→within，25 词，Lv.10，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p88">📥 一键导入 P88</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P92 种子词表（level 11）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P92）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">consist→dozen，37 词，Lv.11，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p92">📥 一键导入 P92</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P97 种子词表（level 12）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P97）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">responsibility→sink，35 词，Lv.12，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p97">📥 一键导入 P97</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P98 种子词表（level 12）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P98）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">skil(l)ful→whisper，34 词，Lv.12，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p98">📥 一键导入 P98</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P99 种子词表（level 12）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P99）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">wisdom→chemist，35 词，Lv.12，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p99">📥 一键导入 P99</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P111 种子词表（Unit 5 词汇, level 9）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P111 · Unit 5）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">invention→itself，8 词（含短语与前缀），Lv.9，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p111">📥 一键导入 P111</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P112 种子词表（Unit 5 词汇续, level 9）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P112 · Unit 5 续）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">button→production，51 词（含短语与搭配），Lv.9，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p112">📥 一键导入 P112</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
-
-    // P113 种子词表（Unit 5 词汇续 2, level 9）
-    h += '<div class="card" style="background:transparent;border:1px dashed var(--line);margin-top:10px">' +
-      '<div class="card-t" style="margin:0;font-size:13px;color:var(--muted)">📥 种子词表（P113 · Unit 5 续2）</div>' +
-      '<p class="tiny muted" style="margin-top:6px">step by step→Wilbur Wright，15 词（含短语、缩写、人名全名），Lv.9，含例句</p>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="btn primary sm" style="flex:1" data-act="import-seed" data-key="p113">📥 一键导入 P113</button>' +
-      '</div>' +
-      '<p class="tiny muted" style="margin-top:8px">仅导入；重复英文词覆盖不增条。</p>' +
-      '</div>';
+    // 种子词表页面：单独行，置于最末（清空当前周下方）
+    if (cap.view === 'seeds') {
+      // 顶部返回条 + 种子词表列表
+      h += '<div class="card" style="background:transparent;border:1px dashed var(--line)">' +
+        '<div class="row" style="align-items:center;gap:8px">' +
+        '<button class="btn line sm" data-act="back-capture" style="padding:6px 12px">← 返回录入</button>' +
+        '<div class="card-t" style="margin:0;flex:1">种子词表列表（共 ' + SEED_CARDS.length + ' 个）</div>' +
+        '</div>' +
+        '<p class="tiny muted" style="margin-top:8px">按「级别升序 → 同级别页码升序」展示；点击卡片按钮即可导入本周词库。</p>' +
+        '</div>';
+      sortedSeedCards().forEach(function (c, i) { h += renderSeedCardHTML(c, i); });
+    } else {
+      // 主视图：清空当前周 + 种子词表列表入口（两张按钮各自一行）
+      h += '<div style="margin-bottom:10px">' +
+        '<button class="btn line wide" data-act="clear-week">🗑 清空当前周</button>' +
+        '</div>';
+      h += '<div style="margin-bottom:10px">' +
+        '<button class="btn line wide" data-act="go-seeds">📚 种子词表列表（共 ' + SEED_CARDS.length + ' 个）</button>' +
+        '</div>';
+    }
 
     el.innerHTML = h;
   }
@@ -334,6 +283,8 @@ window.Views = (function () {
       else if (a === 'save-words') saveWords();
       else if (a === 'import-seed') App.importSeed(b.dataset.key);
       else if (a === 'clear-week') App.clearCurrentWeek(false);
+      else if (a === 'go-seeds') { cap.view = 'seeds'; App.rerender(); document.getElementById('view').scrollTop = 0; }
+      else if (a === 'back-capture') { cap.view = 'main'; App.rerender(); document.getElementById('view').scrollTop = 0; }
     });
     el.addEventListener('input', function (e) {
       var t = e.target;
@@ -403,10 +354,105 @@ window.Views = (function () {
   function saveWords() {
     var list = cap.parsed.filter(function (p) { return p.checked !== false && (p.en || p.cn); });
     if (!list.length) return UI.toast('还没有勾选词条');
-    var r = Store.addWords(list);
-    cap.parsed = []; cap.imgs = [];
-    UI.toast('已加入 ' + r.added + ' 个词条' + (r.overwritten ? '，覆盖 ' + r.overwritten + ' 个重复词' : '') + '到本周词库');
-    App.go('library');
+    // 最后一步：确认级别（必填）/ 页码（选填）/ 单元（选填）
+    var defaults = Store.settings();
+    var presetLv = defaults.defaultLevel || 1;
+    var presetPg = cap.defaultPage || '';
+    var presetUnit = '';
+    // 推断批量默认值：若多数勾选项已有同 level/page/unit，沿用之减少重复输入
+    var lvPick = (function () {
+      var cnt = {};
+      list.forEach(function (p) { if (Number(p.level) > 0) cnt[p.level] = (cnt[p.level] || 0) + 1; });
+      var best = null, bestN = 0;
+      Object.keys(cnt).forEach(function (k) { if (cnt[k] > bestN) { bestN = cnt[k]; best = Number(k); } });
+      return best || presetLv;
+    })();
+    UI.sheet('确认导入信息',
+      '<p class="tiny muted" style="margin-bottom:12px">即将把 <b>' + list.length + '</b> 个词条加入本周词库，请确认它们的归属信息。<span style="color:var(--bad)">*</span> 为必填。</p>' +
+      '<button class="btn line wide" id="save_fill" style="margin-bottom:14px">📖 补充例句</button>' +
+      '<div class="field"><label>级别 <span style="color:var(--bad)">*</span></label>' +
+      lvSelect(lvPick, 'id="save_lv" style="width:100%;border:1px solid var(--line);border-radius:9px;padding:8px"') + '</div>' +
+      '<div class="field"><label>页码</label>' +
+      '<input id="save_pg" placeholder="如 45 / P32-P34" value="' + esc(presetPg) + '" style="width:100%;border:1px solid var(--line);border-radius:9px;padding:8px"></div>' +
+      '<div class="field"><label>单元</label>' +
+      '<input id="save_unit" placeholder="如 Unit 4 / Unit 5 续" value="' + esc(presetUnit) + '" style="width:100%;border:1px solid var(--line);border-radius:9px;padding:8px"></div>' +
+      '<p class="tiny muted" style="margin-top:-4px">未填写项将以勾选项内已填的值优先；空值则不写入。</p>' +
+      '<p id="save_err" class="tiny" style="color:var(--bad);min-height:18px;margin-top:6px;display:none"></p>' +
+      '<div class="row" style="margin-top:14px;gap:10px">' +
+        '<button class="btn line" style="flex:1" data-act="close-sheet">取消</button>' +
+        '<button class="btn" style="flex:1" id="save_ok">确认加入</button>' +
+      '</div>',
+      function (bd) {
+        bd.querySelector('#save_ok').addEventListener('click', function () {
+          var lv = +bd.querySelector('#save_lv').value;
+          var pg = parsePageInput(bd.querySelector('#save_pg').value);
+          var unit = bd.querySelector('#save_unit').value.trim();
+          if (!lv || lv < 1 || lv > 12) {
+            var err = bd.querySelector('#save_err');
+            err.textContent = '请选择有效级别（1-12）';
+            err.style.display = '';
+            return;
+          }
+          // 用用户填的值覆盖到每个勾选项（只在原值为空时填空；有则保留——避免覆盖逐条编辑的结果）
+          list.forEach(function (p) {
+            if (!Number(p.level)) p.level = lv;
+            if (pg != null && (p.page == null || p.page === '')) p.page = pg;
+            if (unit && !p.unit) p.unit = unit;
+          });
+          var r = Store.addWords(list);
+          cap.parsed = []; cap.imgs = [];
+          UI.closeSheet();
+          UI.toast('已加入 ' + r.added + ' 个词条' + (r.overwritten ? '，覆盖 ' + r.overwritten + ' 个重复词' : '') + '到本周词库');
+          App.go('library');
+        });
+
+        // 手动「补充例句」：串行查 /api/dict 取有道双语例句，只回填「例句/翻译都缺」的词；独立于确认加入，不阻塞保存
+        var fillBtn = bd.querySelector('#save_fill');
+        fillBtn.addEventListener('click', function () {
+          var need = list.filter(function (p) { return p.en && !p.example && !p.exampleCn; });
+          if (!need.length) { UI.toast('勾选的词条都已有例句'); return; }
+          fillBtn.disabled = true;
+          fillBtn.textContent = '补充例句中… 0/' + need.length;
+          fillExamples(need, function (n) { fillBtn.textContent = '补充例句中… ' + n + '/' + need.length; })
+            .then(function (filled) {
+              fillBtn.disabled = false;
+              if (filled) { fillBtn.textContent = '已补充 ' + filled + ' 条例句'; UI.toast('已补充 ' + filled + ' 条例句'); }
+              else { fillBtn.textContent = '未查到例句'; UI.toast('未查到例句，可稍后重试或手动填写'); }
+            })
+            .catch(function () { fillBtn.disabled = false; fillBtn.textContent = '补充例句'; });
+        });
+      });
+  }
+
+  // 自动补例句：串行查 /api/dict 取有道双语例句，只回填「例句/翻译都缺」的词。
+  // 逐个串行 + 短间隔，避免触发有道限流；单个失败/超时静默跳过，不阻塞保存。
+  function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function fillExamples(need, onTick) {
+    var i = 0, filled = 0;
+    function step() {
+      if (i >= need.length) return Promise.resolve(filled);
+      var p = need[i++];
+      var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var t = ctrl ? setTimeout(function () { ctrl.abort(); }, 5000) : null;
+      return fetch('/api/dict?q=' + encodeURIComponent(p.en), { credentials: 'same-origin', cache: 'no-store', signal: ctrl ? ctrl.signal : undefined })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          var arr = (j && j.sentences) || [];
+          if (arr.length) { p.example = arr[0].en; p.exampleCn = arr[0].cn; filled++; }
+        })
+        .catch(function () { })
+        .then(function () { if (t) clearTimeout(t); if (onTick) onTick(i); return sleep(100); })
+        .then(step);
+    }
+    return step();
+  }
+
+  // 复用：解析页码字符串为数字（支持 P45 / 45 / P32-P34 取首段）
+  function parsePageInput(s) {
+    s = (s == null ? '' : String(s)).trim();
+    if (!s) return null;
+    var m = s.match(/(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
   }
 
   function pasteSheet() {
@@ -653,15 +699,23 @@ window.Views = (function () {
   /* =========================================================
    *  3. 练习
    * ========================================================= */
-  var pr = { started: false, mode: 'cn2en', range: 'unmastered', limit: 0, result: null, listening: false, picked: null, levels: null, pages: null, excludeName: true };
+  var pr = { started: false, mode: 'cn2en', range: 'unmastered', limit: 0, result: null, listening: false, picked: null, levels: null, pages: null, excludeName: true, recordsView: null, recordId: null };
 
   function practiceRender(el) {
     var h = '';
     var S = Practice.state();
+
+    // 练习记录：列表 / 详情 两个独立视图（优先于正常练习流程）
+    if (pr.recordsView) {
+      el.innerHTML = pr.recordsView === 'detail' ? practiceRecordDetailHtml(pr.recordId) : practiceRecordsListHtml();
+      return;
+    }
+
     var w = Store.activeWeek();
 
     if (!w.words.length) {
-      el.innerHTML = '<div class="empty"><b>🎧</b>本周词库还是空的<br>先去「录入」加一些单词吧</div>';
+      el.innerHTML = '<div class="empty"><b>🎧</b>本周词库还是空的<br>先去「录入」加一些单词吧</div>' +
+        '<button class="btn ghost wide" style="margin-top:8px" data-act="p-records">📋 查看练习记录</button>';
       return;
     }
 
@@ -692,6 +746,7 @@ window.Views = (function () {
         '<input id="pgInput" placeholder="如 45 或 1,3,100（留空=全部页）" value="' + (pr.pages.length ? pr.pages.join(',') : '') + '" style="width:100%;border:1px solid var(--line);border-radius:11px;padding:9px 12px;outline:none;margin-top:6px">' +
         '<p class="tiny muted" style="margin:4px 0 0">留空 = 全部页码；填了只练这些页的词</p>' +
         '<button class="btn wide lg" style="margin-top:16px" data-act="start">开始练习</button>' +
+        '<button class="btn ghost wide" style="margin-top:10px" data-act="p-records">📋 查看练习记录</button>' +
         '<p class="tiny muted" style="margin-top:10px;text-align:center">' +
         (Practice.canListen() ? '支持语音作答（点麦克风说话）与键盘输入' : '当前浏览器不支持语音识别，可用键盘输入作答') +
         '</p></div>';
@@ -700,6 +755,7 @@ window.Views = (function () {
     }
 
     if (Practice.finished()) {
+      if (!S.saved) { Practice.commitSession(); }   // 首次进入完成页时落库一次（saved 守卫由 commitSession 内部持有）
       var rate = S.done ? Math.round(S.ok / S.done * 100) : 0;
       var wrongs = (S.results || []).filter(function (x) { return !x.res.ok; });
       var wrongCnt = wrongs.length;
@@ -888,7 +944,10 @@ window.Views = (function () {
         var id = pr.result.item.word.id;
         Store.toggleMaster(id);
         App.rerender();
-      } else if (a === 'mic') {
+      } else if (a === 'p-records') { pr.recordsView = 'list'; App.rerender(); }
+      else if (a === 'p-rec-back') { pr.recordsView = null; pr.recordId = null; App.rerender(); }
+      else if (a === 'p-rec-view') { pr.recordId = b.dataset.id; pr.recordsView = 'detail'; App.rerender(); }
+      else if (a === 'mic') {
         startListening(b.dataset.lang);
       }
     });
@@ -927,6 +986,87 @@ window.Views = (function () {
       pr.err = err.message;
       App.rerender();
     });
+  }
+
+  /* ---------- 练习记录：列表 / 详情 ---------- */
+  function fmtDur(s) {
+    s = Math.max(0, Math.floor(s || 0));
+    if (s < 60) return s + ' 秒';
+    var m = Math.floor(s / 60), sec = s % 60;
+    return m + ' 分' + (sec ? sec + ' 秒' : '');
+  }
+  function statBox(v, label, color) {
+    return '<div class="rec-stat"><b style="color:' + (color || 'var(--text)') + '">' + v + '</b><span>' + label + '</span></div>';
+  }
+  function practiceRecordsListHtml() {
+    var recs = (Store.practiceSessions() || []).slice().sort(function (a, b) { return (b.startedAt || 0) - (a.startedAt || 0); });
+    var h = '<div class="card"><div class="between" style="margin-bottom:6px"><div class="card-t" style="margin:0">练习记录</div>' +
+      '<button class="btn ghost sm" data-act="p-rec-back">返回</button></div>' +
+      '<p class="tiny muted" style="margin:2px 0 0">共 ' + recs.length + ' 次练习 · 按开始时间倒序</p></div>';
+    if (!recs.length) {
+      h += '<div class="card empty-card">还没有练习记录，去「开始练习」完成一轮吧</div>';
+    } else {
+      h += '<div class="card"><div class="rec-list">';
+      recs.forEach(function (r) {
+        var d = new Date(r.startedAt || Date.now());
+        var ds = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+        var modeName = { mixed: '混合', cn2en: '中→英', en2cn: '英→中', judge: '判断' }[r.mode] || r.mode;
+        var filterName = { unmastered: '未掌握', wrong: '错题', all: '全部' }[r.filter] || r.filter || '—';
+        var rate = (r.rate != null) ? r.rate : (r.total ? Math.round(r.correct / r.total * 100) : 0);
+        h += '<div class="rec-row" data-act="p-rec-view" data-id="' + esc(r.id) + '">' +
+          '<div class="rec-main">' +
+            '<div class="rec-t1"><span class="q-tag">' + modeName + '</span><span class="tiny muted">' + filterName + '</span>' +
+            '<b style="margin-left:auto">' + (r.correct || 0) + '/' + (r.total || 0) + '</b>' +
+            '<span class="tiny muted">· ' + rate + '%</span></div>' +
+            '<div class="tiny muted" style="margin-top:4px">' + ds + ' · 时长 ' + fmtDur(r.duration) + ' · ' + (r.items ? r.items.length : (r.total || 0)) + ' 题</div>' +
+          '</div>' +
+          '<span class="rec-arrow">›</span></div>';
+      });
+      h += '</div></div>';
+    }
+    return h;
+  }
+  function practiceRecordDetailHtml(id) {
+    var r = Store.getPracticeSession(id);
+    if (!r) return '<div class="card"><div class="empty">记录不存在或已删除</div><button class="btn ghost wide" data-act="p-rec-back">返回</button></div>';
+    var d = new Date(r.startedAt || Date.now());
+    var ds = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    var modeName = { mixed: '混合', cn2en: '中→英', en2cn: '英→中', judge: '判断' }[r.mode] || r.mode;
+    var filterName = { unmastered: '未掌握', wrong: '错题', all: '全部' }[r.filter] || r.filter || '—';
+    var rate = (r.rate != null) ? r.rate : (r.total ? Math.round(r.correct / r.total * 100) : 0);
+    var wrongN = (r.items || []).filter(function (it) { return !it.ok; }).length;
+    var h = '<div class="card"><div class="between" style="margin-bottom:6px"><div class="card-t" style="margin:0">练习详情</div>' +
+      '<button class="btn ghost sm" data-act="p-rec-back">返回列表</button></div>' +
+      '<p class="tiny muted" style="margin:2px 0 0">' + ds + ' 开始</p>' +
+      '<div class="row rec-stats">' +
+        statBox(r.total || 0, '总题数') + statBox(r.correct || 0, '答对', '#16a34a') + statBox(wrongN, '答错', '#dc2626') + statBox(rate, '正确率', 'var(--primary)') +
+      '</div>' +
+      '<div class="tiny muted" style="margin-top:8px">模式：' + modeName + ' · 范围：' + filterName + ' · 时长 ' + fmtDur(r.duration) + '</div></div>';
+
+    h += '<div class="card"><div class="card-t">逐题明细（' + (r.items ? r.items.length : 0) + '）</div>';
+    if (!r.items || !r.items.length) {
+      h += '<div class="tiny muted" style="padding:8px 0">该记录没有逐题明细</div>';
+    } else {
+      h += '<div class="rec-detail-list">';
+      r.items.forEach(function (it, i) {
+        var modeName2 = { cn2en: '中→英', en2cn: '英→中', judge: '判断' }[it.mode] || '';
+        h += '<div class="rec-detail-row ' + (it.ok ? 'ok' : 'bad') + '">' +
+          '<div class="rec-d-no">' + (i + 1) + '</div>' +
+          '<div class="rec-d-main">' +
+            '<div class="rec-d-head"><span class="q-tag">' + modeName2 + '</span>' +
+              '<span class="q-tag lv">Lv.' + (Number(it.wordLevel) || 1) + '</span>' +
+              (it.page != null ? '<span class="q-tag pg">P' + it.page + '</span>' : '') +
+              (it.isName ? '<span class="q-tag name">人名</span>' : '') +
+              '<b style="margin-left:auto">' + (it.ok ? '✓' : '✗') + '</b></div>' +
+            '<div class="rec-d-en">' + esc(it.en) + (it.phonetic ? ' <i class="muted">' + esc(it.phonetic) + '</i>' : '') + '</div>' +
+            (it.cn ? '<div class="rec-d-cn muted">' + esc(it.cn) + '</div>' : '') +
+            '<div class="rec-d-ans">你的答案：<b>' + esc(it.answer || '—') + '</b>　正确答案：<b>' + esc(it.correct || '—') + '</b></div>' +
+          '</div></div>';
+      });
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
   }
 
   /* =========================================================
@@ -1483,6 +1623,7 @@ window.Views = (function () {
     bailian: { n: '阿里百炼（通义千问）', b: 'https://dashscope.aliyuncs.com/compatible-mode/v1', m: 'qwen-vl-max-latest' },
     zhipu: { n: '智谱 GLM', b: 'https://open.bigmodel.cn/api/paas/v4', m: 'glm-4v-flash' },
     bailian_tokenplan: { n: '阿里百炼 Token Plan', b: 'https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1', m: 'qwen3.7-plus' },
+    amd: { n: 'AMD Radeon Cloud', b: 'https://developer.amd.com.cn/radeon/api/v1', m: 'Qwen3.8-Flash-Next' },
     custom: { n: '自定义', b: '', m: '' }
   };
   // 阿里百炼视觉模型 = 对应的 Token 计划/档位（不同模型额度与单价不同）
@@ -1517,10 +1658,21 @@ window.Views = (function () {
     }
     return 'custom';
   }
+  // 旧数据迁移：把历史「全局唯一」的 apiKey/model 归入当前服务商名下，并标记已按服务商模式初始化
+  function ensureProvidersMigrated(s) {
+    if (s.currentProvider) return;
+    var prov = providerOf(s.apiBase);
+    s.providers = s.providers || {};
+    if (!s.providers[prov]) s.providers[prov] = { apiKey: s.apiKey || '', model: s.model || '' };
+    s.currentProvider = prov;
+    Store.setSetting('providers', s.providers);
+    Store.setSetting('currentProvider', prov);
+  }
 
   function openSettings() {
     var s = Store.settings();
-    var curProv = providerOf(s.apiBase);
+    ensureProvidersMigrated(s);
+    var curProv = s.currentProvider || providerOf(s.apiBase);
     UI.sheet('设置',
       '<div class="card-t">识别接口（拍照提取词条用）</div>' +
       '<div class="field"><label>服务商</label>' +
@@ -1573,6 +1725,14 @@ window.Views = (function () {
       function (bd) {
         var planField = bd.querySelector('#s_plan_field');
         var planHint = bd.querySelector('#s_plan_hint');
+        var curProvId = s.currentProvider || providerOf(s.apiBase);
+        // 把输入框里当前服务商的 key/model 存回 providers[curProvId]
+        function saveCurProvider() {
+          Store.setProviderConfig(curProvId, {
+            apiKey: bd.querySelector('#s_key').value.trim(),
+            model: bd.querySelector('#s_model').value.trim()
+          });
+        }
         function syncPlanField() {
           var prov = bd.querySelector('#s_provider').value;
           var list = planListFor(prov);
@@ -1593,19 +1753,24 @@ window.Views = (function () {
           }
         }
         bd.querySelector('#s_provider').addEventListener('change', function () {
-          var p = PROVIDERS[this.value];
+          var next = this.value;
+          if (next === curProvId) return; // 没变
+          saveCurProvider();               // 1) 存回旧服务商的 key/model
+          curProvId = next;
+          var p = PROVIDERS[next];
           if (p.b) bd.querySelector('#s_base').value = p.b;
-          if (this.value === 'bailian' || this.value === 'bailian_tokenplan') {
-            // 若当前模型不是该 provider 可选计划，则重置为对应默认（避免沿用其它服务商/端点的模型名）
-            var list = planListFor(this.value);
-            var validPlan = list.some(function (pp) { return pp.v === bd.querySelector('#s_model').value.trim(); });
-            if (!validPlan) bd.querySelector('#s_model').value = p.m;
-            bd.querySelector('#s_key').placeholder = (this.value === 'bailian_tokenplan') ? 'sk-sp-...' : 'sk-...';
-          } else if (p.m && this.value !== 'custom') {
-            bd.querySelector('#s_model').value = p.m;
-          }
+          // 2) 回填新服务商自己存的 key/model（没有则用该服务商默认模型、key 留空）
+          var cfg = Store.providerConfig(next);
+          var useKey = cfg.apiKey || '';
+          var useModel = cfg.model || p.m || '';
+          bd.querySelector('#s_key').value = useKey;
+          bd.querySelector('#s_model').value = useModel;
+          bd.querySelector('#s_key').placeholder = (next === 'bailian_tokenplan') ? 'sk-sp-...' : 'sk-...';
+          // 3) 同步「当前生效值」供 OCR 识别读取
           Store.setSetting('apiBase', bd.querySelector('#s_base').value.trim());
-          Store.setSetting('model', bd.querySelector('#s_model').value.trim());
+          Store.setSetting('apiKey', useKey);
+          Store.setSetting('model', useModel);
+          Store.setSetting('currentProvider', next);
           syncPlanField();
           UI.toast('已切换到 ' + p.n);
         });
@@ -1617,7 +1782,15 @@ window.Views = (function () {
         syncPlanField(); // 初始渲染计划下拉 + 提示
         function bindInput(id, key, cast) {
           bd.querySelector(id).addEventListener('change', function () {
-            Store.setSetting(key, cast ? cast(this.value) : this.value.trim());
+            var v = cast ? cast(this.value) : this.value.trim();
+            Store.setSetting(key, v);
+            // key / model 属于「当前服务商」，同步写回 providers[curProvId] 做到按服务商隔离
+            if (key === 'apiKey' || key === 'model') {
+              Store.setProviderConfig(curProvId, {
+                apiKey: key === 'apiKey' ? v : bd.querySelector('#s_key').value.trim(),
+                model: key === 'model' ? v : bd.querySelector('#s_model').value.trim()
+              });
+            }
             if (id === '#s_model') syncPlanField();
             UI.toast('已保存');
           });
@@ -1686,10 +1859,14 @@ window.Views = (function () {
           this.className = 'btn ' + (v ? 'ghost' : 'line') + ' sm'; this.textContent = v ? '开启' : '关闭';
         });
         bd.querySelector('#s_clearkey').addEventListener('click', function () {
-          bd.querySelector('#s_key').value = ''; Store.setSetting('apiKey', ''); UI.toast('已清空');
+          bd.querySelector('#s_key').value = '';
+          Store.setSetting('apiKey', '');
+          Store.setProviderConfig(curProvId, { apiKey: '', model: bd.querySelector('#s_model').value.trim() });
+          UI.toast('已清空当前服务商 Key');
         });
         bd.querySelector('#s_test').addEventListener('click', function () {
           var btn = this, old = btn.textContent;
+          saveCurProvider(); // 先把当前输入框的 key/model 落盘到该服务商名下，再测试
           btn.textContent = '测试中…';
           OCR.testConnection({
             apiBase: bd.querySelector('#s_base').value.trim(),
@@ -1846,14 +2023,27 @@ window.Views = (function () {
       var regAt = u.createdAt ? new Date(u.createdAt).toLocaleDateString('zh-CN') : '—';
       pop.innerHTML =
         '<div class="user-pop-hd">' +
-          '<div class="user-pop-name">' + esc(u.username) + '</div>' +
+          '<div class="user-pop-name">' + esc(u.username) + (u.role === 'admin' ? ' · 管理员' : '') + '</div>' +
           '<div class="user-pop-sub tiny muted">用户 ID #' + esc(u.id) + ' · 注册 ' + esc(regAt) + '</div>' +
         '</div>' +
+        '<button class="user-pop-btn" data-act="change-pwd">🔑 修改密码</button>' +
+        (u.role === 'admin'
+          ? '<button class="user-pop-btn" data-act="reset-pwd">🔓 重置密码</button>'
+          : '') +
         '<button class="user-pop-btn danger" data-act="logout">退出登录</button>';
       document.body.appendChild(pop);
       var r = btn.getBoundingClientRect();
       pop.style.top = (r.bottom + 6) + 'px';
       pop.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+      pop.querySelector('[data-act="change-pwd"]').addEventListener('click', function () {
+        pop.remove();
+        showChangePassword();
+      });
+      var resetBtn = pop.querySelector('[data-act="reset-pwd"]');
+      if (resetBtn) resetBtn.addEventListener('click', function () {
+        pop.remove();
+        showResetPassword();
+      });
       pop.querySelector('[data-act="logout"]').addEventListener('click', function () {
         pop.remove();
         UI.confirm('退出登录', '退出后当前页面的词库不会丢失，下次用同账号登录仍能看到。', function () {
@@ -1879,8 +2069,117 @@ window.Views = (function () {
     renderUserChip();
   }
 
+  // 修改密码：弹 sheet，校验当前密码 + 新密码（4-64 位）+ 两次一致，调 Auth.changePassword
+  function showChangePassword() {
+    var html =
+      '<div class="auth-field"><span class="auth-lbl">当前密码</span>' +
+        '<input id="cpOld" class="auth-input" type="password" maxlength="64" autocomplete="current-password" placeholder="请输入当前密码"></div>' +
+      '<div class="auth-field"><span class="auth-lbl">新密码 <em class="tiny muted">（4-64 位）</em></span>' +
+        '<input id="cpNew" class="auth-input" type="password" maxlength="64" autocomplete="new-password" placeholder="请输入新密码"></div>' +
+      '<div class="auth-field"><span class="auth-lbl">确认新密码</span>' +
+        '<input id="cpNew2" class="auth-input" type="password" maxlength="64" autocomplete="new-password" placeholder="再次输入新密码"></div>' +
+      '<div id="cpErr" class="auth-err" hidden></div>' +
+      '<button id="cpSubmit" class="btn primary lg wide" type="button" style="margin-top:8px">保存新密码</button>';
+    UI.sheet('修改密码', html, function (bd) {
+      var oldI = bd.querySelector('#cpOld');
+      var newI = bd.querySelector('#cpNew');
+      var new2I = bd.querySelector('#cpNew2');
+      var err = bd.querySelector('#cpErr');
+      var submit = bd.querySelector('#cpSubmit');
+      setTimeout(function () { oldI.focus(); }, 50);
+      function showError(m) { err.textContent = m || ''; err.hidden = !m; }
+      submit.addEventListener('click', function () {
+        var oldP = oldI.value || '';
+        var newP = newI.value || '';
+        var new2 = new2I.value || '';
+        if (!oldP) { showError('请输入当前密码'); oldI.focus(); return; }
+        if (newP.length < 4 || newP.length > 64) { showError('新密码需 4-64 位'); newI.focus(); return; }
+        if (newP !== new2) { showError('两次输入的新密码不一致'); new2I.focus(); return; }
+        submit.disabled = true;
+        var oldText = submit.textContent;
+        submit.textContent = '保存中...';
+        Auth.changePassword(oldP, newP).then(function (out) {
+          if (out.status === 200 && out.body && out.body.ok) {
+            UI.closeSheet();
+            UI.toast('密码已修改', 2000);
+          } else {
+            showError((out.body && out.body.error) || ('请求失败 (' + out.status + ')'));
+            submit.disabled = false;
+            submit.textContent = oldText;
+          }
+        }).catch(function () {
+          showError('网络错误，请重试');
+          submit.disabled = false;
+          submit.textContent = oldText;
+        });
+      });
+    });
+  }
+
+  // 管理员：重置他人密码——下拉选用户 + 新密码 + 确认
+  function showResetPassword() {
+    var html =
+      '<div class="auth-field"><span class="auth-lbl">选择用户</span>' +
+        '<select id="rpUser" class="auth-input"></select></div>' +
+      '<div class="auth-field"><span class="auth-lbl">新密码 <em class="tiny muted">（4-64 位）</em></span>' +
+        '<input id="rpNew" class="auth-input" type="password" maxlength="64" autocomplete="new-password" placeholder="请输入新密码"></div>' +
+      '<div class="auth-field"><span class="auth-lbl">确认新密码</span>' +
+        '<input id="rpNew2" class="auth-input" type="password" maxlength="64" autocomplete="new-password" placeholder="再次输入新密码"></div>' +
+      '<div id="rpErr" class="auth-err" hidden></div>' +
+      '<button id="rpSubmit" class="btn primary lg wide" type="button" style="margin-top:8px">重置密码</button>';
+    UI.sheet('重置密码', html, function (bd) {
+      var sel = bd.querySelector('#rpUser');
+      var newI = bd.querySelector('#rpNew');
+      var new2I = bd.querySelector('#rpNew2');
+      var err = bd.querySelector('#rpErr');
+      var submit = bd.querySelector('#rpSubmit');
+      var loaded = false;
+      sel.innerHTML = '<option value="">加载用户列表中…</option>';
+      function showError(m) { err.textContent = m || ''; err.hidden = !m; }
+      Auth.listUsers().then(function (out) {
+        loaded = true;
+        if (out.status === 200 && out.body && out.body.ok) {
+          var users = out.body.users || [];
+          if (!users.length) { showError('暂无用户可重置'); sel.innerHTML = ''; return; }
+          sel.innerHTML = users.map(function (x) {
+            return '<option value="' + esc(x.id) + '">' + esc(x.username) + (x.role === 'admin' ? '（管理员）' : '') + '</option>';
+          }).join('');
+        } else {
+          showError((out.body && out.body.error) || ('加载用户列表失败 (' + out.status + ')'));
+        }
+      }).catch(function () { loaded = true; showError('网络错误，无法加载用户列表'); });
+      setTimeout(function () { newI.focus(); }, 50);
+      submit.addEventListener('click', function () {
+        if (!loaded) { showError('用户列表加载中，请稍候'); return; }
+        var targetId = Number(sel.value);
+        var newP = newI.value || '';
+        var new2 = new2I.value || '';
+        if (!targetId) { showError('请选择要重置的用户'); return; }
+        if (newP.length < 4 || newP.length > 64) { showError('新密码需 4-64 位'); newI.focus(); return; }
+        if (newP !== new2) { showError('两次输入的新密码不一致'); new2I.focus(); return; }
+        submit.disabled = true;
+        var oldText = submit.textContent;
+        submit.textContent = '重置中...';
+        Auth.resetPassword(targetId, newP).then(function (out) {
+          if (out.status === 200 && out.body && out.body.ok) {
+            UI.closeSheet();
+            UI.toast('密码已重置', 2000);
+          } else {
+            showError((out.body && out.body.error) || ('请求失败 (' + out.status + ')'));
+            submit.disabled = false;
+            submit.textContent = oldText;
+          }
+        }).catch(function () {
+          showError('网络错误，请重试');
+          submit.disabled = false;
+          submit.textContent = oldText;
+        });
+      });
+    });
+  }
+
   return {
-    capture: { render: captureRender, bind: captureBind, reset: function () { } },
+    capture: { render: captureRender, bind: captureBind, reset: function () { cap.view = 'main'; } },
     library: { render: libraryRender, bind: libraryBind },
     practice: { render: practiceRender, bind: practiceBind },
     dictation: { render: dictationRender, bind: dictationBind },

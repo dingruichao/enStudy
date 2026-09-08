@@ -9,6 +9,8 @@ window.Store = (function () {
       apiBase: 'https://api.siliconflow.cn/v1',
       apiKey: '',
       model: 'Qwen/Qwen2.5-VL-32B-Instruct',
+      currentProvider: '',   // 当前选中的服务商 id（'' 表示旧数据，首次打开设置时迁移到 providers）
+      providers: {},          // 每服务商独立存 { apiKey, model }，互不影响
       useLocalOcr: true,
       ttsLang: 'en-US',
       ttsVoice: '',
@@ -27,7 +29,8 @@ window.Store = (function () {
     weeks: {},
     activeWeekId: null,
     logs: [],
-    dictations: []   // 听写记录：一次听写 = 一条记录
+    dictations: [],   // 听写记录：一次听写 = 一条记录
+    practiceSessions: []   // 练习记录：一次练习 = 一条记录（含逐题明细），持久化进 PostgreSQL KV
   };
 
   var data = null;            // 启动后由 init() 从 PostgreSQL 载入；未载入前为 null
@@ -42,6 +45,7 @@ window.Store = (function () {
       out.activeWeekId = p.activeWeekId || null;
       out.logs = p.logs || [];
       out.dictations = p.dictations || [];
+      out.practiceSessions = p.practiceSessions || [];
     } catch (e) { }
     return out;
   }
@@ -345,9 +349,37 @@ window.Store = (function () {
     save();
   }
 
+  /* ---------- 练习记录 ---------- */
+  function practiceSessions() { return data.practiceSessions || (data.practiceSessions = []); }
+  function addPracticeSession(rec) {
+    if (!data.practiceSessions) data.practiceSessions = [];
+    data.practiceSessions.push(rec);
+    if (data.practiceSessions.length > 200) data.practiceSessions = data.practiceSessions.slice(-200);
+    save();
+    return rec;
+  }
+  function getPracticeSession(id) {
+    if (!data.practiceSessions) return null;
+    return data.practiceSessions.filter(function (x) { return x.id === id; })[0] || null;
+  }
+
   /* ---------- 设置 / 导入导出 ---------- */
   function settings() { return data.settings; }
   function setSetting(k, v) { data.settings[k] = v; save(); }
+
+  // 每服务商独立的 key/model（不含 base，base 由服务商固定地址决定）
+  function providerConfig(provId) {
+    var p = (data.settings.providers && data.settings.providers[provId]) || {};
+    return { apiKey: p.apiKey || '', model: p.model || '' };
+  }
+  function setProviderConfig(provId, cfg) {
+    if (!data.settings.providers) data.settings.providers = {};
+    data.settings.providers[provId] = {
+      apiKey: (cfg && cfg.apiKey) || '',
+      model: (cfg && cfg.model) || ''
+    };
+    save();
+  }
 
   function exportJSON() { return JSON.stringify(data, null, 2); }
   function importJSON(txt) {
@@ -369,8 +401,9 @@ window.Store = (function () {
     addWords: addWords, updateWord: updateWord, removeWord: removeWord, toggleMaster: toggleMaster,
     clearWeek: clearWeek, deleteWeek: deleteWeek, carryOver: carryOver,
     record: record, stats: stats,
+    practiceSessions: practiceSessions, addPracticeSession: addPracticeSession, getPracticeSession: getPracticeSession,
     dictations: dictations, addDictation: addDictation, removeDictation: removeDictation, updateDictation: updateDictation,
-    settings: settings, setSetting: setSetting,
+    settings: settings, setSetting: setSetting, providerConfig: providerConfig, setProviderConfig: setProviderConfig,
     exportJSON: exportJSON, importJSON: importJSON, resetAll: resetAll
   };
 })();
